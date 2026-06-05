@@ -84,7 +84,7 @@ Les cinq étapes du plan d'action de correction du backend ont été entièremen
 * **Résultat** : Le script de démarrage local ne plante plus à cause d'un fichier absent.
 
 ### 7. Recherche Globale Unifiée (Endpoint Unique)
-* **Route modifiée** : `GET /api/search`
+* **Route modifiée** : `GET /api/v1/search`
 * **Description** : Centralise toutes les recherches (Deezer, YouTube, SoundCloud) sur un unique point d'accès.
 * **Paramètres acceptés** :
   - `q` : Requête textuelle.
@@ -94,33 +94,33 @@ Les cinq étapes du plan d'action de correction du backend ont été entièremen
 * **Résilience** : En mode `all`, les requêtes s'exécutent en parallèle et les échecs de serveurs tiers sont isolés (le serveur renvoie les résultats des sources fonctionnelles au lieu d'échouer avec une erreur 500).
 
 ### 8. Harmonisation RESTful de tous les Endpoints
-* **Description** : Restructuration complète des routes pour les regrouper de façon logique sous des chemins de ressources standardisés par fournisseur.
+* **Description** : Restructuration complète des routes pour les regrouper de façon logique sous des chemins de ressources standardisés par fournisseur, préfixés par la version `/api/v1/`.
 * **Nouvelle table de correspondance des routes** :
-  - **Recherche** : `GET /api/search?q=...&provider=...`
+  - **Recherche** : `GET /api/v1/search?q=...&provider=...`
   - **Deezer (Track)** : 
-    - Métadonnées : `GET /api/deezer/track/{id}/meta`
-    - Pochette : `GET /api/deezer/track/{id}/cover`
-    - Téléchargement : `GET /api/deezer/track/{id}/download`
+    - Métadonnées : `GET /api/v1/deezer/track/{id}/meta`
+    - Pochette : `GET /api/v1/deezer/track/{id}/cover`
+    - Téléchargement : `GET /api/v1/deezer/track/{id}/download`
   - **Deezer (Album)** : 
-    - Métadonnées : `GET /api/deezer/album/{id}/meta`
-    - Liste pistes : `GET /api/deezer/album/{id}/tracks`
-    - Pochette : `GET /api/deezer/album/{id}/cover`
-    - Téléchargement ZIP : `GET /api/deezer/album/{id}/download`
+    - Métadonnées : `GET /api/v1/deezer/album/{id}/meta`
+    - Liste pistes : `GET /api/v1/deezer/album/{id}/tracks`
+    - Pochette : `GET /api/v1/deezer/album/{id}/cover`
+    - Téléchargement ZIP : `GET /api/v1/deezer/album/{id}/download`
   - **Deezer (Playlist)** : 
-    - Métadonnées : `GET /api/deezer/playlist/{id}/meta`
-    - Pochette : `GET /api/deezer/playlist/{id}/cover`
-    - Téléchargement ZIP : `GET /api/deezer/playlist/{id}/download`
+    - Métadonnées : `GET /api/v1/deezer/playlist/{id}/meta`
+    - Pochette : `GET /api/v1/deezer/playlist/{id}/cover`
+    - Téléchargement ZIP : `GET /api/v1/deezer/playlist/{id}/download`
   - **YouTube** : 
-    - Téléchargement MP3 : `GET /api/youtube/{video_id}/download`
+    - Téléchargement MP3 : `GET /api/v1/youtube/{video_id}/download`
   - **SoundCloud** : 
-    - Téléchargement MP3 : `GET /api/soundcloud/download?url=...`
+    - Téléchargement MP3 : `GET /api/v1/soundcloud/download?url=...`
 
 ---
 
 ## 3. Évolution Future : Pagination des Recherches
 
 ### Objectif
-Permettre un défilement infini (infinite scroll) dans l'application mobile en ajoutant un paramètre `offset` (en plus du `limit` existant) sur la route de recherche unifiée `GET /api/search`.
+Permettre un défilement infini (infinite scroll) dans l'application mobile en ajoutant un paramètre `offset` (en plus du `limit` existant) sur la route de recherche unifiée `GET /api/v1/search`.
 
 ### Conception Technique
 

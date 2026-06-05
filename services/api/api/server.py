@@ -29,7 +29,7 @@ def _load_token_env():
 
 _load_token_env()
 
-from fastapi import FastAPI, HTTPException, Query, Path, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Query, Path, BackgroundTasks, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
@@ -103,9 +103,9 @@ class GlobalSearchResponse(BaseModel):
 app = FastAPI(
     title="Telegramusic API",
     description=(
-        "API REST complète et harmonisée pour chercher et télécharger de la musique depuis Deezer, YouTube et SoundCloud.\n\n"
+        "API REST complète, versionnée et harmonisée pour chercher et télécharger de la musique depuis Deezer, YouTube et SoundCloud.\n\n"
         "### Fonctionnalités principales :\n"
-        "- 🔍 **Recherche unifiée `/api/search`** : Permet de requêter toutes les sources ou une source spécifique avec pagination simulée.\n"
+        "- 🔍 **Recherche unifiée `/api/v1/search`** : Permet de requêter toutes les sources ou une source spécifique avec pagination.\n"
         "- 📥 **Téléchargements cohérents** : Fichiers MP3 ou archives ZIP groupés par fournisseur (Deezer, YouTube, SoundCloud).\n"
         "- ⚡ **Gestion de la concurrence** via un sémaphore global pour préserver les ressources.\n"
         "- 🧹 **Nettoyage automatique** du disque après chaque téléchargement via des tâches d'arrière-plan."
@@ -124,6 +124,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Routeur versionné (V1)
+router = APIRouter(prefix="/api/v1")
 
 # Regex pour valider les IDs / liens Deezer
 TRACK_REGEX = re.compile(r"https?://(?:www\.)?deezer\.com/([a-z]*/)?track/(\d+)/?$")
@@ -200,10 +203,10 @@ async def _search_soundcloud_safe(query: str, limit: int) -> list:
         return []
 
 
-# ---------- Recherche Unifiée ----------
+# ---------- Recherche Unifiée (V1) ----------
 
-@app.get(
-    "/api/search",
+@router.get(
+    "/search",
     summary="Recherche unifiée multi-sources",
     description=(
         "Recherche de musique sur Deezer, YouTube ou SoundCloud.\n\n"
@@ -284,10 +287,10 @@ async def search(
         }
 
 
-# ---------- Deezer - Métadonnées & Pochettes ----------
+# ---------- Deezer - Métadonnées & Pochettes (V1) ----------
 
-@app.get(
-    "/api/deezer/track/{track_id}/meta",
+@router.get(
+    "/deezer/track/{track_id}/meta",
     summary="Obtenir les métadonnées d'un morceau Deezer",
     description="Récupère les détails d'un morceau Deezer sans télécharger le fichier audio.",
     tags=["Deezer - Métadonnées & Pochettes"],
@@ -301,14 +304,14 @@ async def track_meta(
         meta = get_track_metadata_from_api(tid)
         out = {k: v for k, v in meta.items() if k != "cover_data"}
         if meta.get("cover_data"):
-            out["cover_url"] = f"/api/deezer/track/{tid}/cover"
+            out["cover_url"] = f"/api/v1/deezer/track/{tid}/cover"
         return out
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.get(
-    "/api/deezer/album/{album_id}/meta",
+@router.get(
+    "/deezer/album/{album_id}/meta",
     summary="Obtenir les métadonnées d'un album Deezer",
     description="Récupère les détails d'un album Deezer sans le télécharger.",
     tags=["Deezer - Métadonnées & Pochettes"],
@@ -322,14 +325,14 @@ async def album_meta(
         meta = get_album_metadata_from_api(aid)
         out = {k: v for k, v in meta.items() if k != "cover_data"}
         if meta.get("cover_data"):
-            out["cover_url"] = f"/api/deezer/album/{aid}/cover"
+            out["cover_url"] = f"/api/v1/deezer/album/{aid}/cover"
         return out
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.get(
-    "/api/deezer/album/{album_id}/tracks",
+@router.get(
+    "/deezer/album/{album_id}/tracks",
     summary="Obtenir les pistes d'un album Deezer",
     description="Récupère la liste structurée des pistes d'un album Deezer pour affichage sur le client mobile.",
     tags=["Deezer - Métadonnées & Pochettes"],
@@ -374,8 +377,8 @@ async def album_tracks(
     }
 
 
-@app.get(
-    "/api/deezer/playlist/{playlist_id}/meta",
+@router.get(
+    "/deezer/playlist/{playlist_id}/meta",
     summary="Obtenir les métadonnées d'une playlist Deezer",
     description="Récupère les détails d'une playlist Deezer sans la télécharger.",
     tags=["Deezer - Métadonnées & Pochettes"],
@@ -389,14 +392,14 @@ async def playlist_meta(
         meta = get_playlist_metadata_from_api(pid)
         out = {k: v for k, v in meta.items() if k != "cover_data"}
         if meta.get("cover_data"):
-            out["cover_url"] = f"/api/deezer/playlist/{pid}/cover"
+            out["cover_url"] = f"/api/v1/deezer/playlist/{pid}/cover"
         return out
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.get(
-    "/api/deezer/track/{track_id}/cover",
+@router.get(
+    "/deezer/track/{track_id}/cover",
     summary="Récupérer la pochette d'un morceau Deezer",
     description="Retourne directement le fichier image (JPEG) de la pochette d'un morceau Deezer.",
     tags=["Deezer - Métadonnées & Pochettes"],
@@ -422,6 +425,11 @@ async def track_cover(
 
 @app.get(
     "/api/deezer/album/{album_id}/cover",
+    deprecated=True,
+    include_in_schema=False
+)
+@router.get(
+    "/deezer/album/{album_id}/cover",
     summary="Récupérer la pochette d'un album Deezer",
     description="Retourne directement le fichier image (JPEG) de la pochette d'un album Deezer.",
     tags=["Deezer - Métadonnées & Pochettes"],
@@ -432,7 +440,7 @@ async def track_cover(
 async def album_cover(
     album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
 ):
-    aid = _extract_id(album_id, PLAYLIST_REGEX) or album_id  # fallback fallback
+    aid = _extract_id(album_id, PLAYLIST_REGEX) or album_id  # fallback
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
     try:
         meta = get_album_metadata_from_api(aid)
@@ -446,8 +454,8 @@ async def album_cover(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.get(
-    "/api/deezer/playlist/{playlist_id}/cover",
+@router.get(
+    "/deezer/playlist/{playlist_id}/cover",
     summary="Récupérer la pochette d'une playlist Deezer",
     description="Retourne directement le fichier image (JPEG) de la pochette d'une playlist Deezer.",
     tags=["Deezer - Métadonnées & Pochettes"],
@@ -471,10 +479,10 @@ async def playlist_cover(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-# ---------- Téléchargements (Deezer) ----------
+# ---------- Téléchargements (Deezer) (V1) ----------
 
-@app.get(
-    "/api/deezer/track/{track_id}/download",
+@router.get(
+    "/deezer/track/{track_id}/download",
     summary="Télécharger un morceau Deezer",
     description="Télécharge un morceau individuel depuis Deezer et renvoie le fichier audio (MP3 ou FLAC).",
     tags=["Téléchargements"],
@@ -509,8 +517,8 @@ async def download_track_file(
         )
 
 
-@app.get(
-    "/api/deezer/album/{album_id}/download",
+@router.get(
+    "/deezer/album/{album_id}/download",
     summary="Télécharger un album Deezer complet en ZIP",
     description="Télécharge l'intégralité des pistes d'un album Deezer et retourne une archive ZIP compressée.",
     tags=["Téléchargements"],
@@ -558,8 +566,8 @@ async def download_album_zip(
         )
 
 
-@app.get(
-    "/api/deezer/playlist/{playlist_id}/download",
+@router.get(
+    "/deezer/playlist/{playlist_id}/download",
     summary="Télécharger une playlist Deezer en ZIP",
     description="Télécharge l'intégralité des pistes d'une playlist Deezer et retourne une archive ZIP compressée.",
     tags=["Téléchargements"],
@@ -606,10 +614,10 @@ async def download_playlist_zip(
         )
 
 
-# ---------- Téléchargements (YouTube & SoundCloud) ----------
+# ---------- Téléchargements (YouTube & SoundCloud) (V1) ----------
 
-@app.get(
-    "/api/youtube/{video_id}/download",
+@router.get(
+    "/youtube/{video_id}/download",
     summary="Télécharger le flux audio d'une vidéo YouTube",
     description="Télécharge et extrait l'audio d'une vidéo YouTube (MP3 en 320kbps), intègre la miniature et retourne le fichier audio.",
     tags=["Téléchargements"],
@@ -642,8 +650,8 @@ async def download_youtube(
         )
 
 
-@app.get(
-    "/api/soundcloud/download",
+@router.get(
+    "/soundcloud/download",
     summary="Télécharger un morceau SoundCloud",
     description="Télécharge un morceau SoundCloud en utilisant son URL complète et retourne le fichier audio (MP3 en 320kbps) étiqueté.",
     tags=["Téléchargements"],
@@ -675,7 +683,11 @@ async def download_soundcloud(
         )
 
 
-# ---------- Service ----------
+# Inclure le routeur V1 dans l'application
+app.include_router(router)
+
+
+# ---------- Accueil ----------
 
 @app.get(
     "/",
@@ -688,19 +700,19 @@ async def root():
         "service": "Telegramusic API",
         "docs": "/docs",
         "endpoints": {
-            "search": "GET /api/search?q=...&provider=all|deezer|youtube|soundcloud&limit=...",
-            "deezer_track_meta": "GET /api/deezer/track/{id}/meta",
-            "deezer_track_cover": "GET /api/deezer/track/{id}/cover",
-            "deezer_track_download": "GET /api/deezer/track/{id}/download",
-            "deezer_album_meta": "GET /api/deezer/album/{id}/meta",
-            "deezer_album_tracks": "GET /api/deezer/album/{id}/tracks",
-            "deezer_album_cover": "GET /api/deezer/album/{id}/cover",
-            "deezer_album_download": "GET /api/deezer/album/{id}/download",
-            "deezer_playlist_meta": "GET /api/deezer/playlist/{id}/meta",
-            "deezer_playlist_cover": "GET /api/deezer/playlist/{id}/cover",
-            "deezer_playlist_download": "GET /api/deezer/playlist/{id}/download",
-            "youtube_download": "GET /api/youtube/{video_id}/download",
-            "soundcloud_download": "GET /api/soundcloud/download?url=...",
+            "search": "GET /api/v1/search?q=...&provider=all|deezer|youtube|soundcloud&limit=...",
+            "deezer_track_meta": "GET /api/v1/deezer/track/{id}/meta",
+            "deezer_track_cover": "GET /api/v1/deezer/track/{id}/cover",
+            "deezer_track_download": "GET /api/v1/deezer/track/{id}/download",
+            "deezer_album_meta": "GET /api/v1/deezer/album/{id}/meta",
+            "deezer_album_tracks": "GET /api/v1/deezer/album/{id}/tracks",
+            "deezer_album_cover": "GET /api/v1/deezer/album/{id}/cover",
+            "deezer_album_download": "GET /api/v1/deezer/album/{id}/download",
+            "deezer_playlist_meta": "GET /api/v1/deezer/playlist/{id}/meta",
+            "deezer_playlist_cover": "GET /api/v1/deezer/playlist/{id}/cover",
+            "deezer_playlist_download": "GET /api/v1/deezer/playlist/{id}/download",
+            "youtube_download": "GET /api/v1/youtube/{video_id}/download",
+            "soundcloud_download": "GET /api/v1/soundcloud/download?url=...",
         },
     }
 
