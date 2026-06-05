@@ -96,6 +96,16 @@ class AlbumTracksResponse(BaseModel):
     artist: str = Field(..., description="Artiste principal de l'album")
     tracks: List[AlbumTrack] = Field(..., description="Liste des pistes de l'album")
 
+class DeezerGlobalResults(BaseModel):
+    tracks: List[DeezerSearchResult] = Field(..., description="Liste des titres trouvés sur Deezer")
+    albums: List[DeezerSearchResult] = Field(..., description="Liste des albums trouvés sur Deezer")
+
+class GlobalSearchResponse(BaseModel):
+    source: str = Field(..., description="Source ciblée ('all', 'deezer', 'youtube', 'soundcloud')")
+    deezer: Optional[DeezerGlobalResults] = Field(None, description="Résultats Deezer (présents si source='all' ou 'deezer')")
+    youtube: Optional[List[YtdlSearchResult]] = Field(None, description="Résultats YouTube (présents si source='all' ou 'youtube')")
+    soundcloud: Optional[List[YtdlSearchResult]] = Field(None, description="Résultats SoundCloud (présents si source='all' ou 'soundcloud')")
+
 
 # ---------- Initialisation FastAPI ----------
 
@@ -243,6 +253,101 @@ async def search_soundcloud(
     except Exception as e:
         print(f"API /api/search/soundcloud error: {e}", flush=True)
         raise HTTPException(status_code=502, detail=f"Recherche SoundCloud échouée: {e}")
+
+
+# Helper functions to fetch results safely in parallel
+async def _search_deezer_safe(query: str, search_type: str) -> list:
+    try:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, functools.partial(deezer_search, query, search_type)
+        )
+    except Exception as e:
+        print(f"Global search - Deezer {search_type} error: {e}", flush=True)
+        return []
+
+async def _search_youtube_safe(query: str, limit: int) -> list:
+    try:
+        return await yt_dlp_search(query, service="youtube", max_results=limit)
+    except Exception as e:
+        print(f"Global search - YouTube error: {e}", flush=True)
+        return []
+
+async def _search_soundcloud_safe(query: str, limit: int) -> list:
+    try:
+        return await yt_dlp_search(query, service="soundcloud", max_results=limit)
+    except Exception as e:
+        print(f"Global search - SoundCloud error: {e}", flush=True)
+        return []
+
+
+@app.get(
+    "/api/search/global",
+    summary="Recherche globale unifiée multi-sources",
+    description=(
+        "Recherche de musique sur plusieurs sources en parallèle (Deezer, YouTube, SoundCloud).\n\n"
+        "- Si `source` est 'all' (défaut), effectue les recherches en parallèle et retourne un aperçu limité de chaque source (idéal pour l'affichage initial).\n"
+        "- Si `source` est spécifique (ex: 'youtube'), effectue uniquement la recherche pour cette source et retourne les résultats correspondants."
+    ),
+    tags=["Recherche Globale"],
+    response_model=GlobalSearchResponse,
+)
+async def search_global(
+    q: str = Query(..., min_length=1, description="Texte de recherche (ex: 'Adele Hello')"),
+    source: str = Query("all", regex="^(all|deezer|youtube|soundcloud)$", description="Source cible de la recherche"),
+    limit: int = Query(5, ge=1, le=50, description="Nombre de résultats par source (si 'all') ou nombre de résultats total (si source spécifique)"),
+):
+    query = q.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Requête vide")
+
+    if source == "all":
+        # Run all searches in parallel
+        dz_tracks_task = _search_deezer_safe(query, TYPE_TRACK)
+        dz_albums_task = _search_deezer_safe(query, TYPE_ALBUM)
+        yt_task = _search_youtube_safe(query, limit)
+        sc_task = _search_soundcloud_safe(query, limit)
+
+        dz_tracks, dz_albums, yt_results, sc_results = await asyncio.gather(
+            dz_tracks_task, dz_albums_task, yt_task, sc_task
+        )
+
+        return {
+            "source": "all",
+            "deezer": {
+                "tracks": dz_tracks[:limit],
+                "albums": dz_albums[:limit]
+            },
+            "youtube": yt_results[:limit],
+            "soundcloud": sc_results[:limit]
+        }
+
+    elif source == "deezer":
+        dz_tracks, dz_albums = await asyncio.gather(
+            _search_deezer_safe(query, TYPE_TRACK),
+            _search_deezer_safe(query, TYPE_ALBUM)
+        )
+        return {
+            "source": "deezer",
+            "deezer": {
+                "tracks": dz_tracks[:limit],
+                "albums": dz_albums[:limit]
+            }
+        }
+
+    elif source == "youtube":
+        yt_results = await _search_youtube_safe(query, limit)
+        return {
+            "source": "youtube",
+            "youtube": yt_results[:limit]
+        }
+
+    elif source == "soundcloud":
+        sc_results = await _search_soundcloud_safe(query, limit)
+        return {
+            "source": "soundcloud",
+            "soundcloud": sc_results[:limit]
+        }
 
 
 # ---------- Métadonnées (sans téléchargement) ----------
@@ -656,6 +761,7 @@ async def root():
         "docs": "/docs",
         "endpoints": {
             "search_deezer": "GET /api/search?q=...&type=track|album",
+            "search_global": "GET /api/search/global?q=...&source=all|deezer|youtube|soundcloud&limit=5",
             "search_youtube": "GET /api/search/youtube?q=...",
             "search_soundcloud": "GET /api/search/soundcloud?q=...",
             "track_meta": "GET /api/track/{id}/meta",
