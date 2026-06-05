@@ -56,15 +56,11 @@ _download_semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
 
 class DeezerSearchResult(BaseModel):
     id: str = Field(..., description="ID unique du titre ou de l'album Deezer")
+    id_type: str = Field(..., description="Le type de ressource ('track' ou 'album')")
     title: str = Field(..., description="Titre du morceau ou nom de l'album")
     artist: str = Field(..., description="Nom de l'artiste principal")
     album: Optional[str] = Field(None, description="Nom de l'album (si titre)")
     img_url: Optional[str] = Field(None, description="URL de la pochette")
-
-class DeezerSearchResponse(BaseModel):
-    query: str = Field(..., description="La requête de recherche originale")
-    type: str = Field(..., description="Le type recherché ('track' ou 'album')")
-    results: List[DeezerSearchResult] = Field(..., description="Liste des résultats trouvés")
 
 class YtdlSearchResult(BaseModel):
     id: str = Field(..., description="ID unique de la vidéo YouTube ou du titre SoundCloud")
@@ -74,10 +70,6 @@ class YtdlSearchResult(BaseModel):
     img_url: Optional[str] = Field(None, description="URL de la miniature")
     url: str = Field(..., description="Lien direct vers la source")
     duration: Optional[int] = Field(None, description="Durée de la piste en secondes")
-
-class YtdlSearchResponse(BaseModel):
-    query: str = Field(..., description="La requête de recherche originale")
-    results: List[YtdlSearchResult] = Field(..., description="Liste des résultats trouvés")
 
 class AlbumTrack(BaseModel):
     id: str = Field(..., description="ID unique du morceau Deezer")
@@ -111,14 +103,14 @@ class GlobalSearchResponse(BaseModel):
 app = FastAPI(
     title="Telegramusic API",
     description=(
-        "API REST complète pour chercher et télécharger de la musique depuis Deezer, YouTube et SoundCloud.\n\n"
+        "API REST complète et harmonisée pour chercher et télécharger de la musique depuis Deezer, YouTube et SoundCloud.\n\n"
         "### Fonctionnalités principales :\n"
-        "- 🔍 **Recherche et métadonnées** enrichies pour Deezer, YouTube et SoundCloud.\n"
-        "- 📥 **Téléchargements sécurisés** de fichiers MP3 simples ou d'archives ZIP d'albums/playlists.\n"
+        "- 🔍 **Recherche unifiée `/api/search`** : Permet de requêter toutes les sources ou une source spécifique avec pagination simulée.\n"
+        "- 📥 **Téléchargements cohérents** : Fichiers MP3 ou archives ZIP groupés par fournisseur (Deezer, YouTube, SoundCloud).\n"
         "- ⚡ **Gestion de la concurrence** via un sémaphore global pour préserver les ressources.\n"
         "- 🧹 **Nettoyage automatique** du disque après chaque téléchargement via des tâches d'arrière-plan."
     ),
-    version="1.2.0",
+    version="2.0.0",
     contact={
         "name": "BenKL404",
         "url": "https://github.com/BenKL404/lkm-player",
@@ -181,80 +173,8 @@ async def startup_event():
         print(f"Erreur lors du nettoyage au démarrage: {e}", flush=True)
 
 
-# ---------- Recherche ----------
+# ---------- Fonctions d'Aide pour Recherche Parallèle ----------
 
-
-@app.get(
-    "/api/search",
-    summary="Rechercher des morceaux ou albums sur Deezer",
-    description="Recherche dans le catalogue de Deezer. Retourne jusqu'à 30 résultats.",
-    tags=["Deezer - Recherche & Métadonnées"],
-    response_model=DeezerSearchResponse,
-)
-async def search(
-    q: str = Query(..., min_length=1, description="Texte de recherche (ex: 'Adele Hello')"),
-    type: str = Query("track", regex="^(track|album)$", description="Type de ressource à chercher ('track' ou 'album')"),
-):
-    query = (q or "").strip()
-    if not query:
-        raise HTTPException(status_code=400, detail="Requête vide")
-    search_type = TYPE_ALBUM if type == "album" else TYPE_TRACK
-    try:
-        loop = asyncio.get_running_loop()
-        results = await loop.run_in_executor(
-            None, functools.partial(deezer_search, query, search_type)
-        )
-    except Exception as e:
-        print(f"API /api/search error: {e}", flush=True)
-        raise HTTPException(status_code=502, detail=f"Recherche échouée: {e}")
-    return {"query": query, "type": type, "results": results[:30]}
-
-
-@app.get(
-    "/api/search/youtube",
-    summary="Rechercher des vidéos sur YouTube",
-    description="Recherche dans le catalogue de YouTube à l'aide de `yt-dlp`.",
-    tags=["YouTube & SoundCloud - Recherche"],
-    response_model=YtdlSearchResponse,
-)
-async def search_youtube(
-    q: str = Query(..., min_length=1, description="Texte de recherche (ex: 'Adele Hello')"),
-    limit: int = Query(15, ge=1, le=50, description="Nombre maximum de résultats retournés (1 à 50)"),
-):
-    query = q.strip()
-    if not query:
-        raise HTTPException(status_code=400, detail="Requête vide")
-    try:
-        results = await yt_dlp_search(query, service="youtube", max_results=limit)
-        return {"query": query, "results": results}
-    except Exception as e:
-        print(f"API /api/search/youtube error: {e}", flush=True)
-        raise HTTPException(status_code=502, detail=f"Recherche YouTube échouée: {e}")
-
-
-@app.get(
-    "/api/search/soundcloud",
-    summary="Rechercher des titres sur SoundCloud",
-    description="Recherche dans le catalogue de SoundCloud à l'aide de `yt-dlp`.",
-    tags=["YouTube & SoundCloud - Recherche"],
-    response_model=YtdlSearchResponse,
-)
-async def search_soundcloud(
-    q: str = Query(..., min_length=1, description="Texte de recherche (ex: 'Chill Lofi')"),
-    limit: int = Query(15, ge=1, le=50, description="Nombre maximum de résultats retournés (1 à 50)"),
-):
-    query = q.strip()
-    if not query:
-        raise HTTPException(status_code=400, detail="Requête vide")
-    try:
-        results = await yt_dlp_search(query, service="soundcloud", max_results=limit)
-        return {"query": query, "results": results}
-    except Exception as e:
-        print(f"API /api/search/soundcloud error: {e}", flush=True)
-        raise HTTPException(status_code=502, detail=f"Recherche SoundCloud échouée: {e}")
-
-
-# Helper functions to fetch results safely in parallel
 async def _search_deezer_safe(query: str, search_type: str) -> list:
     try:
         loop = asyncio.get_running_loop()
@@ -262,50 +182,57 @@ async def _search_deezer_safe(query: str, search_type: str) -> list:
             None, functools.partial(deezer_search, query, search_type)
         )
     except Exception as e:
-        print(f"Global search - Deezer {search_type} error: {e}", flush=True)
+        print(f"Search - Deezer {search_type} error: {e}", flush=True)
         return []
 
 async def _search_youtube_safe(query: str, limit: int) -> list:
     try:
         return await yt_dlp_search(query, service="youtube", max_results=limit)
     except Exception as e:
-        print(f"Global search - YouTube error: {e}", flush=True)
+        print(f"Search - YouTube error: {e}", flush=True)
         return []
 
 async def _search_soundcloud_safe(query: str, limit: int) -> list:
     try:
         return await yt_dlp_search(query, service="soundcloud", max_results=limit)
     except Exception as e:
-        print(f"Global search - SoundCloud error: {e}", flush=True)
+        print(f"Search - SoundCloud error: {e}", flush=True)
         return []
 
 
+# ---------- Recherche Unifiée ----------
+
 @app.get(
-    "/api/search/global",
-    summary="Recherche globale unifiée multi-sources",
+    "/api/search",
+    summary="Recherche unifiée multi-sources",
     description=(
-        "Recherche de musique sur plusieurs sources en parallèle (Deezer, YouTube, SoundCloud).\n\n"
-        "- Si `source` est 'all' (défaut), effectue les recherches en parallèle et retourne un aperçu limité de chaque source (idéal pour l'affichage initial).\n"
-        "- Si `source` est spécifique (ex: 'youtube'), effectue uniquement la recherche pour cette source et retourne les résultats correspondants."
+        "Recherche de musique sur Deezer, YouTube ou SoundCloud.\n\n"
+        "- Si `provider` est 'all' (par défaut), effectue les recherches en parallèle sur toutes les sources et retourne un aperçu limité de chaque source (idéal pour l'affichage initial).\n"
+        "- Si `provider` est spécifique (ex: 'youtube'), effectue uniquement la recherche pour cette source et retourne les résultats correspondants."
     ),
-    tags=["Recherche Globale"],
+    tags=["Recherche"],
     response_model=GlobalSearchResponse,
 )
-async def search_global(
+async def search(
     q: str = Query(..., min_length=1, description="Texte de recherche (ex: 'Adele Hello')"),
-    source: str = Query("all", regex="^(all|deezer|youtube|soundcloud)$", description="Source cible de la recherche"),
-    limit: int = Query(5, ge=1, le=50, description="Nombre de résultats par source (si 'all') ou nombre de résultats total (si source spécifique)"),
+    provider: str = Query("all", regex="^(all|deezer|youtube|soundcloud)$", description="Source cible de la recherche"),
+    type: str = Query("track", regex="^(track|album)$", description="Type de recherche (uniquement pour Deezer)"),
+    limit: Optional[int] = Query(None, ge=1, le=50, description="Nombre maximum de résultats retournés (défaut : 5 par source si 'all', 20 si source spécifique)"),
 ):
     query = q.strip()
     if not query:
         raise HTTPException(status_code=400, detail="Requête vide")
 
-    if source == "all":
-        # Run all searches in parallel
+    # Détermine la limite par défaut selon le provider
+    default_limit = 5 if provider == "all" else 20
+    actual_limit = limit if limit is not None else default_limit
+
+    if provider == "all":
+        # Lance toutes les recherches en parallèle
         dz_tracks_task = _search_deezer_safe(query, TYPE_TRACK)
         dz_albums_task = _search_deezer_safe(query, TYPE_ALBUM)
-        yt_task = _search_youtube_safe(query, limit)
-        sc_task = _search_soundcloud_safe(query, limit)
+        yt_task = _search_youtube_safe(query, actual_limit)
+        sc_task = _search_soundcloud_safe(query, actual_limit)
 
         dz_tracks, dz_albums, yt_results, sc_results = await asyncio.gather(
             dz_tracks_task, dz_albums_task, yt_task, sc_task
@@ -314,49 +241,56 @@ async def search_global(
         return {
             "source": "all",
             "deezer": {
-                "tracks": dz_tracks[:limit],
-                "albums": dz_albums[:limit]
+                "tracks": dz_tracks[:actual_limit],
+                "albums": dz_albums[:actual_limit]
             },
-            "youtube": yt_results[:limit],
-            "soundcloud": sc_results[:limit]
+            "youtube": yt_results[:actual_limit],
+            "soundcloud": sc_results[:actual_limit]
         }
 
-    elif source == "deezer":
-        dz_tracks, dz_albums = await asyncio.gather(
-            _search_deezer_safe(query, TYPE_TRACK),
-            _search_deezer_safe(query, TYPE_ALBUM)
-        )
-        return {
-            "source": "deezer",
-            "deezer": {
-                "tracks": dz_tracks[:limit],
-                "albums": dz_albums[:limit]
+    elif provider == "deezer":
+        search_type = TYPE_ALBUM if type == "album" else TYPE_TRACK
+        dz_results = await _search_deezer_safe(query, search_type)
+        
+        if type == "album":
+            return {
+                "source": "deezer",
+                "deezer": {
+                    "tracks": [],
+                    "albums": dz_results[:actual_limit]
+                }
             }
-        }
+        else:
+            return {
+                "source": "deezer",
+                "deezer": {
+                    "tracks": dz_results[:actual_limit],
+                    "albums": []
+                }
+            }
 
-    elif source == "youtube":
-        yt_results = await _search_youtube_safe(query, limit)
+    elif provider == "youtube":
+        yt_results = await _search_youtube_safe(query, actual_limit)
         return {
             "source": "youtube",
-            "youtube": yt_results[:limit]
+            "youtube": yt_results[:actual_limit]
         }
 
-    elif source == "soundcloud":
-        sc_results = await _search_soundcloud_safe(query, limit)
+    elif provider == "soundcloud":
+        sc_results = await _search_soundcloud_safe(query, actual_limit)
         return {
             "source": "soundcloud",
-            "soundcloud": sc_results[:limit]
+            "soundcloud": sc_results[:actual_limit]
         }
 
 
-# ---------- Métadonnées (sans téléchargement) ----------
-
+# ---------- Deezer - Métadonnées & Pochettes ----------
 
 @app.get(
-    "/api/track/{track_id}/meta",
+    "/api/deezer/track/{track_id}/meta",
     summary="Obtenir les métadonnées d'un morceau Deezer",
     description="Récupère les détails d'un morceau Deezer sans télécharger le fichier audio.",
-    tags=["Deezer - Recherche & Métadonnées"],
+    tags=["Deezer - Métadonnées & Pochettes"],
     response_model=Dict[str, Any],
 )
 async def track_meta(
@@ -367,17 +301,17 @@ async def track_meta(
         meta = get_track_metadata_from_api(tid)
         out = {k: v for k, v in meta.items() if k != "cover_data"}
         if meta.get("cover_data"):
-            out["cover_url"] = f"/api/track/{tid}/cover"
+            out["cover_url"] = f"/api/deezer/track/{tid}/cover"
         return out
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @app.get(
-    "/api/album/{album_id}/meta",
+    "/api/deezer/album/{album_id}/meta",
     summary="Obtenir les métadonnées d'un album Deezer",
     description="Récupère les détails d'un album Deezer sans le télécharger.",
-    tags=["Deezer - Recherche & Métadonnées"],
+    tags=["Deezer - Métadonnées & Pochettes"],
     response_model=Dict[str, Any],
 )
 async def album_meta(
@@ -388,17 +322,17 @@ async def album_meta(
         meta = get_album_metadata_from_api(aid)
         out = {k: v for k, v in meta.items() if k != "cover_data"}
         if meta.get("cover_data"):
-            out["cover_url"] = f"/api/album/{aid}/cover"
+            out["cover_url"] = f"/api/deezer/album/{aid}/cover"
         return out
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @app.get(
-    "/api/album/{album_id}/tracks",
+    "/api/deezer/album/{album_id}/tracks",
     summary="Obtenir les pistes d'un album Deezer",
     description="Récupère la liste structurée des pistes d'un album Deezer pour affichage sur le client mobile.",
-    tags=["Deezer - Recherche & Métadonnées"],
+    tags=["Deezer - Métadonnées & Pochettes"],
     response_model=AlbumTracksResponse,
 )
 async def album_tracks(
@@ -441,10 +375,10 @@ async def album_tracks(
 
 
 @app.get(
-    "/api/playlist/{playlist_id}/meta",
+    "/api/deezer/playlist/{playlist_id}/meta",
     summary="Obtenir les métadonnées d'une playlist Deezer",
     description="Récupère les détails d'une playlist Deezer sans la télécharger.",
-    tags=["Deezer - Recherche & Métadonnées"],
+    tags=["Deezer - Métadonnées & Pochettes"],
     response_model=Dict[str, Any],
 )
 async def playlist_meta(
@@ -455,20 +389,17 @@ async def playlist_meta(
         meta = get_playlist_metadata_from_api(pid)
         out = {k: v for k, v in meta.items() if k != "cover_data"}
         if meta.get("cover_data"):
-            out["cover_url"] = f"/api/playlist/{pid}/cover"
+            out["cover_url"] = f"/api/deezer/playlist/{pid}/cover"
         return out
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
-# ---------- Pochettes (images) ----------
-
-
 @app.get(
-    "/api/track/{track_id}/cover",
+    "/api/deezer/track/{track_id}/cover",
     summary="Récupérer la pochette d'un morceau Deezer",
     description="Retourne directement le fichier image (JPEG) de la pochette d'un morceau Deezer.",
-    tags=["Deezer - Recherche & Métadonnées"],
+    tags=["Deezer - Métadonnées & Pochettes"],
     responses={
         200: {"content": {"image/jpeg": {}}, "description": "Fichier image JPEG de la pochette."}
     },
@@ -490,10 +421,10 @@ async def track_cover(
 
 
 @app.get(
-    "/api/album/{album_id}/cover",
+    "/api/deezer/album/{album_id}/cover",
     summary="Récupérer la pochette d'un album Deezer",
     description="Retourne directement le fichier image (JPEG) de la pochette d'un album Deezer.",
-    tags=["Deezer - Recherche & Métadonnées"],
+    tags=["Deezer - Métadonnées & Pochettes"],
     responses={
         200: {"content": {"image/jpeg": {}}, "description": "Fichier image JPEG de la pochette."}
     },
@@ -501,6 +432,7 @@ async def track_cover(
 async def album_cover(
     album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
 ):
+    aid = _extract_id(album_id, PLAYLIST_REGEX) or album_id  # fallback fallback
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
     try:
         meta = get_album_metadata_from_api(aid)
@@ -515,10 +447,10 @@ async def album_cover(
 
 
 @app.get(
-    "/api/playlist/{playlist_id}/cover",
+    "/api/deezer/playlist/{playlist_id}/cover",
     summary="Récupérer la pochette d'une playlist Deezer",
     description="Retourne directement le fichier image (JPEG) de la pochette d'une playlist Deezer.",
-    tags=["Deezer - Recherche & Métadonnées"],
+    tags=["Deezer - Métadonnées & Pochettes"],
     responses={
         200: {"content": {"image/jpeg": {}}, "description": "Fichier image JPEG de la pochette."}
     },
@@ -541,9 +473,8 @@ async def playlist_cover(
 
 # ---------- Téléchargements (Deezer) ----------
 
-
 @app.get(
-    "/api/download/track/{track_id}",
+    "/api/deezer/track/{track_id}/download",
     summary="Télécharger un morceau Deezer",
     description="Télécharge un morceau individuel depuis Deezer et renvoie le fichier audio (MP3 ou FLAC).",
     tags=["Téléchargements"],
@@ -579,7 +510,7 @@ async def download_track_file(
 
 
 @app.get(
-    "/api/download/album/{album_id}",
+    "/api/deezer/album/{album_id}/download",
     summary="Télécharger un album Deezer complet en ZIP",
     description="Télécharge l'intégralité des pistes d'un album Deezer et retourne une archive ZIP compressée.",
     tags=["Téléchargements"],
@@ -628,7 +559,7 @@ async def download_album_zip(
 
 
 @app.get(
-    "/api/download/playlist/{playlist_id}",
+    "/api/deezer/playlist/{playlist_id}/download",
     summary="Télécharger une playlist Deezer en ZIP",
     description="Télécharge l'intégralité des pistes d'une playlist Deezer et retourne une archive ZIP compressée.",
     tags=["Téléchargements"],
@@ -677,9 +608,8 @@ async def download_playlist_zip(
 
 # ---------- Téléchargements (YouTube & SoundCloud) ----------
 
-
 @app.get(
-    "/api/download/youtube/{video_id}",
+    "/api/youtube/{video_id}/download",
     summary="Télécharger le flux audio d'une vidéo YouTube",
     description="Télécharge et extrait l'audio d'une vidéo YouTube (MP3 en 320kbps), intègre la miniature et retourne le fichier audio.",
     tags=["Téléchargements"],
@@ -713,7 +643,7 @@ async def download_youtube(
 
 
 @app.get(
-    "/api/download/soundcloud",
+    "/api/soundcloud/download",
     summary="Télécharger un morceau SoundCloud",
     description="Télécharge un morceau SoundCloud en utilisant son URL complète et retourne le fichier audio (MP3 en 320kbps) étiqueté.",
     tags=["Téléchargements"],
@@ -745,8 +675,7 @@ async def download_soundcloud(
         )
 
 
-# ---------- Accueil ----------
-
+# ---------- Service ----------
 
 @app.get(
     "/",
@@ -759,19 +688,19 @@ async def root():
         "service": "Telegramusic API",
         "docs": "/docs",
         "endpoints": {
-            "search_deezer": "GET /api/search?q=...&type=track|album",
-            "search_global": "GET /api/search/global?q=...&source=all|deezer|youtube|soundcloud&limit=5",
-            "search_youtube": "GET /api/search/youtube?q=...",
-            "search_soundcloud": "GET /api/search/soundcloud?q=...",
-            "track_meta": "GET /api/track/{id}/meta",
-            "download_track": "GET /api/download/track/{id}",
-            "download_youtube": "GET /api/download/youtube/{video_id}",
-            "download_soundcloud": "GET /api/download/soundcloud?url=...",
-            "album_meta": "GET /api/album/{id}/meta",
-            "album_tracks": "GET /api/album/{id}/tracks",
-            "download_album": "GET /api/download/album/{id}",
-            "playlist_meta": "GET /api/playlist/{id}/meta",
-            "download_playlist": "GET /api/download/playlist/{id}",
+            "search": "GET /api/search?q=...&provider=all|deezer|youtube|soundcloud&limit=...",
+            "deezer_track_meta": "GET /api/deezer/track/{id}/meta",
+            "deezer_track_cover": "GET /api/deezer/track/{id}/cover",
+            "deezer_track_download": "GET /api/deezer/track/{id}/download",
+            "deezer_album_meta": "GET /api/deezer/album/{id}/meta",
+            "deezer_album_tracks": "GET /api/deezer/album/{id}/tracks",
+            "deezer_album_cover": "GET /api/deezer/album/{id}/cover",
+            "deezer_album_download": "GET /api/deezer/album/{id}/download",
+            "deezer_playlist_meta": "GET /api/deezer/playlist/{id}/meta",
+            "deezer_playlist_cover": "GET /api/deezer/playlist/{id}/cover",
+            "deezer_playlist_download": "GET /api/deezer/playlist/{id}/download",
+            "youtube_download": "GET /api/youtube/{video_id}/download",
+            "soundcloud_download": "GET /api/soundcloud/download?url=...",
         },
     }
 
