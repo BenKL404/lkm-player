@@ -14,7 +14,6 @@ import os
 import re
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from urllib.parse import quote
 
 # Charger token.env avant tout import qui utilise os.environ (ex: handlers.deezer)
 def _load_token_env():

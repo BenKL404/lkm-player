@@ -1,13 +1,11 @@
 import asyncio
 import io
 import os
-import re
 import requests
 from pathlib import Path
 from PIL import Image
 from mutagen.id3 import ID3, error, APIC
 from mutagen.mp3 import MP3
-import yt_dlp
 from yt_dlp import YoutubeDL
 from utils import TMP_DIR
 
