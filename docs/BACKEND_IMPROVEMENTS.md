@@ -83,39 +83,63 @@ Les cinq étapes du plan d'action de correction du backend ont été entièremen
   - Fichier de configuration local : [token.env](file:///D:/PROJETS/lkm-player/services/api/token.env)
 * **Résultat** : Le script de démarrage local ne plante plus à cause d'un fichier absent.
 
-### 7. Recherche Globale Unifiée Multi-Sources
-* **Route créée** : `GET /api/search/global`
-* **Description** : Recherche en parallèle sur Deezer (titres et albums), YouTube et SoundCloud.
-* **Fonctionnalités** :
-  - **Recherche globale (`source=all`)** : Retourne un aperçu limité (par défaut `limit=5` par source), idéal pour un premier affichage global dans l'application.
-  - **Recherche ciblée (`source=deezer|youtube|soundcloud`)** : Effectue uniquement la recherche pour la source spécifiée afin de récupérer les résultats complets d'une source unique.
-  - **Résilience** : Les appels réseau vers chaque service sont isolés. Si l'un des services échoue ou est mal configuré (ex: token Deezer manquant), le serveur continue et renvoie les résultats des autres sources au lieu de générer une erreur HTTP 500 globale.
+### 7. Recherche Globale Unifiée (Endpoint Unique)
+* **Route modifiée** : `GET /api/search`
+* **Description** : Centralise toutes les recherches (Deezer, YouTube, SoundCloud) sur un unique point d'accès.
+* **Paramètres acceptés** :
+  - `q` : Requête textuelle.
+  - `provider` : Fournisseur de recherche (`all`, `deezer`, `youtube`, `soundcloud`). Par défaut : `all`.
+  - `type` : Type de résultat pour Deezer (`track` ou `album`). Par défaut : `track`.
+  - `limit` : Limite (défaut : 5 par source si `all`, 20 si source spécifique).
+* **Résilience** : En mode `all`, les requêtes s'exécutent en parallèle et les échecs de serveurs tiers sont isolés (le serveur renvoie les résultats des sources fonctionnelles au lieu d'échouer avec une erreur 500).
+
+### 8. Harmonisation RESTful de tous les Endpoints
+* **Description** : Restructuration complète des routes pour les regrouper de façon logique sous des chemins de ressources standardisés par fournisseur.
+* **Nouvelle table de correspondance des routes** :
+  - **Recherche** : `GET /api/search?q=...&provider=...`
+  - **Deezer (Track)** : 
+    - Métadonnées : `GET /api/deezer/track/{id}/meta`
+    - Pochette : `GET /api/deezer/track/{id}/cover`
+    - Téléchargement : `GET /api/deezer/track/{id}/download`
+  - **Deezer (Album)** : 
+    - Métadonnées : `GET /api/deezer/album/{id}/meta`
+    - Liste pistes : `GET /api/deezer/album/{id}/tracks`
+    - Pochette : `GET /api/deezer/album/{id}/cover`
+    - Téléchargement ZIP : `GET /api/deezer/album/{id}/download`
+  - **Deezer (Playlist)** : 
+    - Métadonnées : `GET /api/deezer/playlist/{id}/meta`
+    - Pochette : `GET /api/deezer/playlist/{id}/cover`
+    - Téléchargement ZIP : `GET /api/deezer/playlist/{id}/download`
+  - **YouTube** : 
+    - Téléchargement MP3 : `GET /api/youtube/{video_id}/download`
+  - **SoundCloud** : 
+    - Téléchargement MP3 : `GET /api/soundcloud/download?url=...`
 
 ---
 
 ## 3. Évolution Future : Pagination des Recherches
 
 ### Objectif
-Permettre un défilement infini (infinite scroll) dans l'application mobile en remplaçant la limite fixe par des paramètres de pagination standard (`offset` et `limit`) sur toutes les routes de recherche (`/api/search`, `/api/search/youtube`, `/api/search/soundcloud`).
+Permettre un défilement infini (infinite scroll) dans l'application mobile en ajoutant un paramètre `offset` (en plus du `limit` existant) sur la route de recherche unifiée `GET /api/search`.
 
 ### Conception Technique
 
 #### A. Recherche Deezer (Pagination Native)
-Le paramètre `deezer_search` sera modifié pour accepter `offset` (index) et `limit`.
-L'URL appelée sur l'API de Deezer passera de :
+Le paramètre de recherche Deezer passera de :
 `https://api.deezer.com/search/{type}?q={query}`
 à :
 `https://api.deezer.com/search/{type}?q={query}&index={offset}&limit={limit}`
 
 #### B. Recherche YouTube & SoundCloud (Pagination Simulée via `yt-dlp`)
-Comme `yt-dlp` ne gère pas de paramètre d'offset pour les recherches textuelles, nous appliquerons une stratégie de découpage :
-1. Calculer le nombre total de résultats à extraire : `max_results = offset + limit`.
-2. Lancer la recherche `yt-dlp` pour extraire ces `max_results` (ex: `ytsearch30:query` pour `offset=15` et `limit=15`).
+Comme `yt-dlp` ne gère pas d'offset, nous appliquerons le découpage :
+1. Calculer `max_results = offset + limit`.
+2. Extraire ces `max_results` via `yt-dlp`.
 3. Découper la liste de résultats en Python : `results[offset : offset + limit]`.
-4. Mettre en place un plafond de sécurité de `offset + limit <= 100` pour préserver le temps de réponse de l'API.
+4. Plafonner à `offset + limit <= 100` pour préserver les temps de réponse.
 
 #### C. Paramètres d'API attendus
-Toutes les routes de recherche accepteront désormais :
+La route `GET /api/search` acceptera désormais :
 * `q: str` (Requis) : Requête textuelle.
-* `offset: int` (Optionnel, défaut `0`) : Index du premier résultat.
-* `limit: int` (Optionnel, défaut `20`) : Nombre de résultats à retourner.
+* `provider: str` (Optionnel) : Fournisseur cible.
+* `offset: int` (Optionnel, défaut `0`) : Index de départ.
+* `limit: int` (Optionnel) : Nombre de résultats.
