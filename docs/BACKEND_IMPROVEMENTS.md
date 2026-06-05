@@ -83,6 +83,14 @@ Les cinq étapes du plan d'action de correction du backend ont été entièremen
   - Fichier de configuration local : [token.env](file:///D:/PROJETS/lkm-player/services/api/token.env)
 * **Résultat** : Le script de démarrage local ne plante plus à cause d'un fichier absent.
 
+### 7. Recherche Globale Unifiée Multi-Sources
+* **Route créée** : `GET /api/search/global`
+* **Description** : Recherche en parallèle sur Deezer (titres et albums), YouTube et SoundCloud.
+* **Fonctionnalités** :
+  - **Recherche globale (`source=all`)** : Retourne un aperçu limité (par défaut `limit=5` par source), idéal pour un premier affichage global dans l'application.
+  - **Recherche ciblée (`source=deezer|youtube|soundcloud`)** : Effectue uniquement la recherche pour la source spécifiée afin de récupérer les résultats complets d'une source unique.
+  - **Résilience** : Les appels réseau vers chaque service sont isolés. Si l'un des services échoue ou est mal configuré (ex: token Deezer manquant), le serveur continue et renvoie les résultats des autres sources au lieu de générer une erreur HTTP 500 globale.
+
 ---
 
 ## 3. Évolution Future : Pagination des Recherches
