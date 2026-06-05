@@ -13,6 +13,7 @@ import functools
 import os
 import re
 from pathlib import Path
+from typing import List, Optional, Dict, Any
 from urllib.parse import quote
 
 # Charger token.env avant tout import qui utilise os.environ (ex: handlers.deezer)
@@ -29,9 +30,10 @@ def _load_token_env():
 
 _load_token_env()
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Path, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel, Field
 
 # Import de la logique métier (handlers.deezer initialise la session Deezer au chargement)
 from handlers.deezer import (
@@ -43,15 +45,75 @@ from handlers.deezer import (
     get_track_metadata_from_api,
 )
 from dl_utils.deezer_download import TYPE_ALBUM, TYPE_TRACK, deezer_search
+from dl_utils.yt_download import download_yt_dlp, yt_dlp_search
 from utils import TMP_DIR
 
-# Verrou pour éviter trop de téléchargements concurrents côté API
-_download_lock = asyncio.Lock()
+# Sémaphore pour limiter le nombre de téléchargements concurrents côté API
+MAX_CONCURRENT_DOWNLOADS = int(os.environ.get("MAX_CONCURRENT_DOWNLOADS", "3"))
+_download_semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+
+
+# ---------- Modèles de données Pydantic (OpenAPI Schemas) ----------
+
+class DeezerSearchResult(BaseModel):
+    id: str = Field(..., description="ID unique du titre ou de l'album Deezer")
+    title: str = Field(..., description="Titre du morceau ou nom de l'album")
+    artist: str = Field(..., description="Nom de l'artiste principal")
+    album: Optional[str] = Field(None, description="Nom de l'album (si titre)")
+    img_url: Optional[str] = Field(None, description="URL de la pochette")
+
+class DeezerSearchResponse(BaseModel):
+    query: str = Field(..., description="La requête de recherche originale")
+    type: str = Field(..., description="Le type recherché ('track' ou 'album')")
+    results: List[DeezerSearchResult] = Field(..., description="Liste des résultats trouvés")
+
+class YtdlSearchResult(BaseModel):
+    id: str = Field(..., description="ID unique de la vidéo YouTube ou du titre SoundCloud")
+    id_type: str = Field(..., description="Le service d'origine ('youtube' ou 'soundcloud')")
+    title: str = Field(..., description="Titre de la piste ou de la vidéo")
+    artist: str = Field(..., description="Nom de la chaîne ou de l'artiste")
+    img_url: Optional[str] = Field(None, description="URL de la miniature")
+    url: str = Field(..., description="Lien direct vers la source")
+    duration: Optional[int] = Field(None, description="Durée de la piste en secondes")
+
+class YtdlSearchResponse(BaseModel):
+    query: str = Field(..., description="La requête de recherche originale")
+    results: List[YtdlSearchResult] = Field(..., description="Liste des résultats trouvés")
+
+class AlbumTrack(BaseModel):
+    id: str = Field(..., description="ID unique du morceau Deezer")
+    id_type: str = Field("track", description="Le type de ressource")
+    title: str = Field(..., description="Titre du morceau")
+    artist: str = Field(..., description="Artiste du morceau")
+    album: str = Field(..., description="Titre de l'album associé")
+    album_id: str = Field(..., description="ID unique de l'album associé")
+    img_url: Optional[str] = Field(None, description="URL de la pochette")
+    preview_url: Optional[str] = Field(None, description="URL de l'extrait audio (preview)")
+
+class AlbumTracksResponse(BaseModel):
+    album_id: str = Field(..., description="ID de l'album Deezer")
+    album_title: str = Field(..., description="Titre de l'album")
+    artist: str = Field(..., description="Artiste principal de l'album")
+    tracks: List[AlbumTrack] = Field(..., description="Liste des pistes de l'album")
+
+
+# ---------- Initialisation FastAPI ----------
 
 app = FastAPI(
     title="Telegramusic API",
-    description="API de téléchargement musique (Deezer). Pour usage depuis une app sans Telegram.",
-    version="1.0.0",
+    description=(
+        "API REST complète pour chercher et télécharger de la musique depuis Deezer, YouTube et SoundCloud.\n\n"
+        "### Fonctionnalités principales :\n"
+        "- 🔍 **Recherche et métadonnées** enrichies pour Deezer, YouTube et SoundCloud.\n"
+        "- 📥 **Téléchargements sécurisés** de fichiers MP3 simples ou d'archives ZIP d'albums/playlists.\n"
+        "- ⚡ **Gestion de la concurrence** via un sémaphore global pour préserver les ressources.\n"
+        "- 🧹 **Nettoyage automatique** du disque après chaque téléchargement via des tâches d'arrière-plan."
+    ),
+    version="1.2.0",
+    contact={
+        "name": "BenKL404",
+        "url": "https://github.com/BenKL404/lkm-player",
+    },
 )
 
 app.add_middleware(
@@ -78,19 +140,52 @@ def _extract_id(link: str | None, regex: re.Pattern) -> str | None:
     return m.group(2) if m else None
 
 
+def _cleanup_path(path_to_clean: Path):
+    """Nettoie de manière sécurisée un fichier ou un répertoire temporaire."""
+    try:
+        import shutil
+        if path_to_clean.exists():
+            if path_to_clean.is_dir():
+                shutil.rmtree(path_to_clean, ignore_errors=True)
+            else:
+                path_to_clean.unlink(missing_ok=True)
+            print(f"Nettoyage réussi pour {path_to_clean}", flush=True)
+    except Exception as e:
+        print(f"Erreur lors du nettoyage de {path_to_clean}: {e}", flush=True)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Nettoyage du dossier temporaire lors du démarrage de l'API."""
+    print("Nettoyage du dossier de téléchargement temporaire...", flush=True)
+    try:
+        import shutil
+        tmp_path = Path(TMP_DIR)
+        if tmp_path.exists():
+            for child in tmp_path.iterdir():
+                if child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    child.unlink(missing_ok=True)
+            print("Nettoyage au démarrage terminé avec succès.", flush=True)
+    except Exception as e:
+        print(f"Erreur lors du nettoyage au démarrage: {e}", flush=True)
+
+
 # ---------- Recherche ----------
 
 
-@app.get("/api/search")
+@app.get(
+    "/api/search",
+    summary="Rechercher des morceaux ou albums sur Deezer",
+    description="Recherche dans le catalogue de Deezer. Retourne jusqu'à 30 résultats.",
+    tags=["Deezer - Recherche & Métadonnées"],
+    response_model=DeezerSearchResponse,
+)
 async def search(
-    q: str = Query(..., min_length=1),
-    type: str = Query("track", regex="^(track|album)$"),
+    q: str = Query(..., min_length=1, description="Texte de recherche (ex: 'Adele Hello')"),
+    type: str = Query("track", regex="^(track|album)$", description="Type de ressource à chercher ('track' ou 'album')"),
 ):
-    """
-    Recherche Deezer.
-    - q: requête texte (espaces en début/fin ignorés)
-    - type: "track" ou "album"
-    """
     query = (q or "").strip()
     if not query:
         raise HTTPException(status_code=400, detail="Requête vide")
@@ -106,16 +201,66 @@ async def search(
     return {"query": query, "type": type, "results": results[:30]}
 
 
+@app.get(
+    "/api/search/youtube",
+    summary="Rechercher des vidéos sur YouTube",
+    description="Recherche dans le catalogue de YouTube à l'aide de `yt-dlp`.",
+    tags=["YouTube & SoundCloud - Recherche"],
+    response_model=YtdlSearchResponse,
+)
+async def search_youtube(
+    q: str = Query(..., min_length=1, description="Texte de recherche (ex: 'Adele Hello')"),
+    limit: int = Query(15, ge=1, le=50, description="Nombre maximum de résultats retournés (1 à 50)"),
+):
+    query = q.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Requête vide")
+    try:
+        results = await yt_dlp_search(query, service="youtube", max_results=limit)
+        return {"query": query, "results": results}
+    except Exception as e:
+        print(f"API /api/search/youtube error: {e}", flush=True)
+        raise HTTPException(status_code=502, detail=f"Recherche YouTube échouée: {e}")
+
+
+@app.get(
+    "/api/search/soundcloud",
+    summary="Rechercher des titres sur SoundCloud",
+    description="Recherche dans le catalogue de SoundCloud à l'aide de `yt-dlp`.",
+    tags=["YouTube & SoundCloud - Recherche"],
+    response_model=YtdlSearchResponse,
+)
+async def search_soundcloud(
+    q: str = Query(..., min_length=1, description="Texte de recherche (ex: 'Chill Lofi')"),
+    limit: int = Query(15, ge=1, le=50, description="Nombre maximum de résultats retournés (1 à 50)"),
+):
+    query = q.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Requête vide")
+    try:
+        results = await yt_dlp_search(query, service="soundcloud", max_results=limit)
+        return {"query": query, "results": results}
+    except Exception as e:
+        print(f"API /api/search/soundcloud error: {e}", flush=True)
+        raise HTTPException(status_code=502, detail=f"Recherche SoundCloud échouée: {e}")
+
+
 # ---------- Métadonnées (sans téléchargement) ----------
 
 
-@app.get("/api/track/{track_id}/meta")
-async def track_meta(track_id: str):
-    """Métadonnées d'un morceau Deezer (sans téléchargement)."""
+@app.get(
+    "/api/track/{track_id}/meta",
+    summary="Obtenir les métadonnées d'un morceau Deezer",
+    description="Récupère les détails d'un morceau Deezer sans télécharger le fichier audio.",
+    tags=["Deezer - Recherche & Métadonnées"],
+    response_model=Dict[str, Any],
+)
+async def track_meta(
+    track_id: str = Path(..., description="ID unique du morceau Deezer ou URL complète"),
+):
     tid = _extract_id(track_id, TRACK_REGEX) or track_id
     try:
         meta = get_track_metadata_from_api(tid)
-        # Ne pas renvoyer cover_data en base64 dans le JSON par défaut (trop lourd)
         out = {k: v for k, v in meta.items() if k != "cover_data"}
         if meta.get("cover_data"):
             out["cover_url"] = f"/api/track/{tid}/cover"
@@ -124,9 +269,16 @@ async def track_meta(track_id: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.get("/api/album/{album_id}/meta")
-async def album_meta(album_id: str):
-    """Métadonnées d'un album Deezer (sans téléchargement)."""
+@app.get(
+    "/api/album/{album_id}/meta",
+    summary="Obtenir les métadonnées d'un album Deezer",
+    description="Récupère les détails d'un album Deezer sans le télécharger.",
+    tags=["Deezer - Recherche & Métadonnées"],
+    response_model=Dict[str, Any],
+)
+async def album_meta(
+    album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
+):
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
     try:
         meta = get_album_metadata_from_api(aid)
@@ -138,9 +290,16 @@ async def album_meta(album_id: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.get("/api/album/{album_id}/tracks")
-async def album_tracks(album_id: str):
-    """Liste des pistes d'un album Deezer, formatée pour le client mobile."""
+@app.get(
+    "/api/album/{album_id}/tracks",
+    summary="Obtenir les pistes d'un album Deezer",
+    description="Récupère la liste structurée des pistes d'un album Deezer pour affichage sur le client mobile.",
+    tags=["Deezer - Recherche & Métadonnées"],
+    response_model=AlbumTracksResponse,
+)
+async def album_tracks(
+    album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
+):
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
     try:
         meta = get_album_metadata_from_api(aid)
@@ -177,9 +336,16 @@ async def album_tracks(album_id: str):
     }
 
 
-@app.get("/api/playlist/{playlist_id}/meta")
-async def playlist_meta(playlist_id: str):
-    """Métadonnées d'une playlist Deezer (sans téléchargement)."""
+@app.get(
+    "/api/playlist/{playlist_id}/meta",
+    summary="Obtenir les métadonnées d'une playlist Deezer",
+    description="Récupère les détails d'une playlist Deezer sans la télécharger.",
+    tags=["Deezer - Recherche & Métadonnées"],
+    response_model=Dict[str, Any],
+)
+async def playlist_meta(
+    playlist_id: str = Path(..., description="ID unique de la playlist Deezer ou URL complète"),
+):
     pid = _extract_id(playlist_id, PLAYLIST_REGEX) or playlist_id
     try:
         meta = get_playlist_metadata_from_api(pid)
@@ -194,9 +360,18 @@ async def playlist_meta(playlist_id: str):
 # ---------- Pochettes (images) ----------
 
 
-@app.get("/api/track/{track_id}/cover")
-async def track_cover(track_id: str):
-    """Pochette d'un morceau (JPEG)."""
+@app.get(
+    "/api/track/{track_id}/cover",
+    summary="Récupérer la pochette d'un morceau Deezer",
+    description="Retourne directement le fichier image (JPEG) de la pochette d'un morceau Deezer.",
+    tags=["Deezer - Recherche & Métadonnées"],
+    responses={
+        200: {"content": {"image/jpeg": {}}, "description": "Fichier image JPEG de la pochette."}
+    },
+)
+async def track_cover(
+    track_id: str = Path(..., description="ID unique du morceau Deezer ou URL complète"),
+):
     tid = _extract_id(track_id, TRACK_REGEX) or track_id
     try:
         meta = get_track_metadata_from_api(tid)
@@ -210,9 +385,18 @@ async def track_cover(track_id: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.get("/api/album/{album_id}/cover")
-async def album_cover(album_id: str):
-    """Pochette d'un album (JPEG)."""
+@app.get(
+    "/api/album/{album_id}/cover",
+    summary="Récupérer la pochette d'un album Deezer",
+    description="Retourne directement le fichier image (JPEG) de la pochette d'un album Deezer.",
+    tags=["Deezer - Recherche & Métadonnées"],
+    responses={
+        200: {"content": {"image/jpeg": {}}, "description": "Fichier image JPEG de la pochette."}
+    },
+)
+async def album_cover(
+    album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
+):
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
     try:
         meta = get_album_metadata_from_api(aid)
@@ -226,9 +410,18 @@ async def album_cover(album_id: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.get("/api/playlist/{playlist_id}/cover")
-async def playlist_cover(playlist_id: str):
-    """Pochette d'une playlist (JPEG)."""
+@app.get(
+    "/api/playlist/{playlist_id}/cover",
+    summary="Récupérer la pochette d'une playlist Deezer",
+    description="Retourne directement le fichier image (JPEG) de la pochette d'une playlist Deezer.",
+    tags=["Deezer - Recherche & Métadonnées"],
+    responses={
+        200: {"content": {"image/jpeg": {}}, "description": "Fichier image JPEG de la pochette."}
+    },
+)
+async def playlist_cover(
+    playlist_id: str = Path(..., description="ID unique de la playlist Deezer ou URL complète"),
+):
     pid = _extract_id(playlist_id, PLAYLIST_REGEX) or playlist_id
     try:
         meta = get_playlist_metadata_from_api(pid)
@@ -242,16 +435,22 @@ async def playlist_cover(playlist_id: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-# ---------- Téléchargement ----------
+# ---------- Téléchargements (Deezer) ----------
 
 
-@app.get("/api/download/track/{track_id}")
-async def download_track_file(track_id: str):
-    """
-    Télécharge un morceau Deezer et renvoie le fichier audio (MP3/FLAC).
-    """
+@app.get(
+    "/api/download/track/{track_id}",
+    summary="Télécharger un morceau Deezer",
+    description="Télécharge un morceau individuel depuis Deezer et renvoie le fichier audio (MP3 ou FLAC).",
+    tags=["Téléchargements"],
+    response_class=FileResponse,
+)
+async def download_track_file(
+    track_id: str = Path(..., description="ID unique du morceau Deezer ou URL complète"),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
     tid = _extract_id(track_id, TRACK_REGEX) or track_id
-    async with _download_lock:
+    async with _download_semaphore:
         try:
             dl_info = await download_track(tid)
         except Exception as e:
@@ -265,16 +464,9 @@ async def download_track_file(track_id: str):
         filename = re.sub(r'[<>:"/\\|?*]', "_", filename)
         base_dir = dl_info.get("download_dir")
 
-        async def cleanup_later():
-            await asyncio.sleep(10)
-            try:
-                import shutil
-                if base_dir and Path(base_dir).exists():
-                    shutil.rmtree(base_dir, ignore_errors=True)
-            except Exception:
-                pass
+        if base_dir:
+            background_tasks.add_task(_cleanup_path, Path(base_dir))
 
-        asyncio.create_task(cleanup_later())
         return FileResponse(
             path=str(song_path),
             filename=filename,
@@ -282,13 +474,19 @@ async def download_track_file(track_id: str):
         )
 
 
-@app.get("/api/download/album/{album_id}")
-async def download_album_zip(album_id: str):
-    """
-    Télécharge un album Deezer et renvoie une archive ZIP des pistes.
-    """
+@app.get(
+    "/api/download/album/{album_id}",
+    summary="Télécharger un album Deezer complet en ZIP",
+    description="Télécharge l'intégralité des pistes d'un album Deezer et retourne une archive ZIP compressée.",
+    tags=["Téléchargements"],
+    response_class=FileResponse,
+)
+async def download_album_zip(
+    album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
-    async with _download_lock:
+    async with _download_semaphore:
         try:
             dl_tracks = await download_album(aid)
         except Exception as e:
@@ -315,18 +513,9 @@ async def download_album_zip(album_id: str):
         if not zip_path.exists():
             raise HTTPException(status_code=502, detail="Échec création ZIP")
 
-        async def cleanup_album_later():
-            await asyncio.sleep(60)
-            try:
-                import shutil
-                if zip_path.exists():
-                    zip_path.unlink()
-                if source_dir.exists():
-                    shutil.rmtree(source_dir, ignore_errors=True)
-            except Exception:
-                pass
+        background_tasks.add_task(_cleanup_path, zip_path)
+        background_tasks.add_task(_cleanup_path, source_dir)
 
-        asyncio.create_task(cleanup_album_later())
         return FileResponse(
             path=str(zip_path),
             filename=f"{safe_name}.zip",
@@ -334,13 +523,19 @@ async def download_album_zip(album_id: str):
         )
 
 
-@app.get("/api/download/playlist/{playlist_id}")
-async def download_playlist_zip(playlist_id: str):
-    """
-    Télécharge une playlist Deezer et renvoie une archive ZIP des pistes.
-    """
+@app.get(
+    "/api/download/playlist/{playlist_id}",
+    summary="Télécharger une playlist Deezer en ZIP",
+    description="Télécharge l'intégralité des pistes d'une playlist Deezer et retourne une archive ZIP compressée.",
+    tags=["Téléchargements"],
+    response_class=FileResponse,
+)
+async def download_playlist_zip(
+    playlist_id: str = Path(..., description="ID unique de la playlist Deezer ou URL complète"),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
     pid = _extract_id(playlist_id, PLAYLIST_REGEX) or playlist_id
-    async with _download_lock:
+    async with _download_semaphore:
         try:
             dl_tracks = await download_playlist(pid)
         except Exception as e:
@@ -366,18 +561,9 @@ async def download_playlist_zip(playlist_id: str):
         if not zip_path.exists():
             raise HTTPException(status_code=502, detail="Échec création ZIP")
 
-        async def cleanup_playlist_later():
-            await asyncio.sleep(60)
-            try:
-                import shutil
-                if zip_path.exists():
-                    zip_path.unlink()
-                if source_dir.exists():
-                    shutil.rmtree(source_dir, ignore_errors=True)
-            except Exception:
-                pass
+        background_tasks.add_task(_cleanup_path, zip_path)
+        background_tasks.add_task(_cleanup_path, source_dir)
 
-        asyncio.create_task(cleanup_playlist_later())
         return FileResponse(
             path=str(zip_path),
             filename=f"{safe_name}.zip",
@@ -385,15 +571,97 @@ async def download_playlist_zip(playlist_id: str):
         )
 
 
-@app.get("/")
+# ---------- Téléchargements (YouTube & SoundCloud) ----------
+
+
+@app.get(
+    "/api/download/youtube/{video_id}",
+    summary="Télécharger le flux audio d'une vidéo YouTube",
+    description="Télécharge et extrait l'audio d'une vidéo YouTube (MP3 en 320kbps), intègre la miniature et retourne le fichier audio.",
+    tags=["Téléchargements"],
+    response_class=FileResponse,
+)
+async def download_youtube(
+    video_id: str = Path(..., description="ID unique de la vidéo YouTube (ex: 'dQw4w9WgXcQ') ou URL complète"),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
+    url = f"https://www.youtube.com/watch?v={video_id}" if not video_id.startswith("http") else video_id
+    async with _download_semaphore:
+        try:
+            result = await download_yt_dlp(url, is_soundcloud=False)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        
+        song_path = Path(result["song_path"])
+        if not song_path.exists():
+            raise HTTPException(status_code=502, detail="Fichier non trouvé")
+        
+        filename = f"{result['artist']} - {result['title']}.mp3"
+        filename = re.sub(r'[<>:"/\\|?*]', "_", filename)
+        
+        background_tasks.add_task(_cleanup_path, song_path)
+        
+        return FileResponse(
+            path=str(song_path),
+            filename=filename,
+            media_type="audio/mpeg",
+        )
+
+
+@app.get(
+    "/api/download/soundcloud",
+    summary="Télécharger un morceau SoundCloud",
+    description="Télécharge un morceau SoundCloud en utilisant son URL complète et retourne le fichier audio (MP3 en 320kbps) étiqueté.",
+    tags=["Téléchargements"],
+    response_class=FileResponse,
+)
+async def download_soundcloud(
+    url: str = Query(..., description="URL complète du titre SoundCloud (ex: 'https://soundcloud.com/artist/track')"),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
+    async with _download_semaphore:
+        try:
+            result = await download_yt_dlp(url, is_soundcloud=True)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        
+        song_path = Path(result["song_path"])
+        if not song_path.exists():
+            raise HTTPException(status_code=502, detail="Fichier non trouvé")
+        
+        filename = f"{result['artist']} - {result['title']}.mp3"
+        filename = re.sub(r'[<>:"/\\|?*]', "_", filename)
+        
+        background_tasks.add_task(_cleanup_path, song_path)
+        
+        return FileResponse(
+            path=str(song_path),
+            filename=filename,
+            media_type="audio/mpeg",
+        )
+
+
+# ---------- Accueil ----------
+
+
+@app.get(
+    "/",
+    summary="Obtenir la liste des routes de l'API",
+    description="Retourne une description simplifiée de l'état du service et des points d'accès disponibles.",
+    tags=["Service"],
+)
 async def root():
     return {
         "service": "Telegramusic API",
         "docs": "/docs",
         "endpoints": {
-            "search": "GET /api/search?q=...&type=track|album",
+            "search_deezer": "GET /api/search?q=...&type=track|album",
+            "search_youtube": "GET /api/search/youtube?q=...",
+            "search_soundcloud": "GET /api/search/soundcloud?q=...",
             "track_meta": "GET /api/track/{id}/meta",
             "download_track": "GET /api/download/track/{id}",
+            "download_youtube": "GET /api/download/youtube/{video_id}",
+            "download_soundcloud": "GET /api/download/soundcloud?url=...",
             "album_meta": "GET /api/album/{id}/meta",
             "album_tracks": "GET /api/album/{id}/tracks",
             "download_album": "GET /api/download/album/{id}",
