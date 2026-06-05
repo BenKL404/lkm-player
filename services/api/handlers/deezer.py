@@ -26,6 +26,7 @@ from aiogram.types import (
 from unidecode import unidecode
 
 from bot import bot
+import dl_utils.deezer_download as deezer_download
 from dl_utils.deezer_download import (
     TYPE_ALBUM,
     TYPE_TRACK,
@@ -44,6 +45,7 @@ from utils import (
     add_downloading,
     is_downloading,
     remove_downloading,
+    get_bot_download_semaphore,
 )
 
 deezer_router = Router()
@@ -166,7 +168,9 @@ async def download_track(track_id, retries=MAX_RETRIES):
             file_extension, deezer_format = get_file_format(track_infos)
 
             # Create a temporary directory for this track
-            tmp_track_base_dir = Path(TMP_DIR) / "deezer" / "track" / str(track_id)
+            import uuid
+            unique_id = uuid.uuid4().hex[:8]
+            tmp_track_base_dir = Path(TMP_DIR) / "deezer" / "track" / f"{track_id}_{unique_id}"
             tmp_track_base_dir.mkdir(parents=True, exist_ok=True)
 
             # Determine the expected final file path within our base dir
@@ -259,7 +263,9 @@ async def download_album(album_id, retries=MAX_RETRIES):
                 )
 
             # Create a temporary directory for this album download ONCE after successful metadata fetch
-            tmp_download_dir = Path(TMP_DIR) / "deezer" / "album" / str(album_id)
+            import uuid
+            unique_id = uuid.uuid4().hex[:8]
+            tmp_download_dir = Path(TMP_DIR) / "deezer" / "album" / f"{album_id}_{unique_id}"
             tmp_download_dir.mkdir(parents=True, exist_ok=True)
             print(
                 f"Album metadata fetched successfully. Download dir: {tmp_download_dir}"
@@ -419,7 +425,9 @@ async def download_playlist(playlist_id, retries=MAX_RETRIES):
                     f"Could not get playlist info for {playlist_id} (empty list received)"
                 )
 
-            tmp_download_dir = Path(TMP_DIR) / "deezer" / "playlist" / str(playlist_id)
+            import uuid
+            unique_id = uuid.uuid4().hex[:8]
+            tmp_download_dir = Path(TMP_DIR) / "deezer" / "playlist" / f"{playlist_id}_{unique_id}"
             tmp_download_dir.mkdir(parents=True, exist_ok=True)
             print(
                 f"Playlist metadata fetched. Download dir: {tmp_download_dir}"
@@ -521,7 +529,7 @@ async def download_playlist(playlist_id, retries=MAX_RETRIES):
 def get_track_metadata_from_api(track_id):
     """Gets track metadata from the official Deezer API."""
     try:
-        response = requests.get(API_TRACK % quote(str(track_id)))
+        response = deezer_download.session.get(API_TRACK % quote(str(track_id)))
         response.raise_for_status()  # Raise an exception for bad status codes
         track_json = response.json()
 
@@ -537,7 +545,7 @@ def get_track_metadata_from_api(track_id):
         )
 
         # Fetch cover image data
-        cover_response = requests.get(cover_url, stream=True)
+        cover_response = deezer_download.session.get(cover_url, stream=True)
         cover_response.raise_for_status()
         cover_data = cover_response.content  # Read content directly
 
@@ -596,14 +604,14 @@ def get_album_metadata_from_api(album_id):
     """Gets album and its tracks' metadata from the official Deezer API."""
     try:
         # Fetch main album info
-        album_response = requests.get(API_ALBUM % quote(str(album_id)))
+        album_response = deezer_download.session.get(API_ALBUM % quote(str(album_id)))
         album_response.raise_for_status()
         album_json = album_response.json()
         if "error" in album_json:
             raise ValueError(f"API Error for album {album_id}: {album_json['error']}")
 
         # Fetch track list (handle pagination if necessary, though 1000 limit is high)
-        tracks_response = requests.get(
+        tracks_response = deezer_download.session.get(
             API_ALBUM % quote(str(album_id)) + "/tracks?limit=1000"
         )
         tracks_response.raise_for_status()
@@ -626,7 +634,7 @@ def get_album_metadata_from_api(album_id):
         )
 
         # Fetch cover image data
-        cover_response = requests.get(cover_url, stream=True)
+        cover_response = deezer_download.session.get(cover_url, stream=True)
         cover_response.raise_for_status()
         cover_data = cover_response.content
 
@@ -697,7 +705,7 @@ def get_album_caption(metadata):
 def get_playlist_metadata_from_api(playlist_id):
     """Gets playlist and its tracks' metadata from the official Deezer API."""
     try:
-        playlist_response = requests.get(API_PLAYLIST % quote(str(playlist_id)))
+        playlist_response = deezer_download.session.get(API_PLAYLIST % quote(str(playlist_id)))
         playlist_response.raise_for_status()
         playlist_json = playlist_response.json()
         if "error" in playlist_json:
@@ -705,7 +713,7 @@ def get_playlist_metadata_from_api(playlist_id):
                 f"API Error for playlist {playlist_id}: {playlist_json['error']}"
             )
 
-        tracks_response = requests.get(
+        tracks_response = deezer_download.session.get(
             API_PLAYLIST % quote(str(playlist_id)) + "/tracks?limit=1000"
         )
         tracks_response.raise_for_status()
@@ -726,7 +734,7 @@ def get_playlist_metadata_from_api(playlist_id):
             or ""
         )
         if cover_url:
-            cover_response = requests.get(cover_url, stream=True)
+            cover_response = deezer_download.session.get(cover_url, stream=True)
             cover_response.raise_for_status()
             cover_data = cover_response.content
         else:
@@ -1436,7 +1444,8 @@ async def handle_track_link(event: types.Message, real_link=None):
 
     try:
         # Download the track
-        dl_track_info = await download_track(track_id)
+        async with get_bot_download_semaphore():
+            dl_track_info = await download_track(track_id)
         if not dl_track_info or "song_path" not in dl_track_info:
             raise ValueError("Track download failed or did not return path.")
 
@@ -1519,7 +1528,8 @@ async def handle_album_link(event: types.Message, real_link=None):
 
     try:
         # Download the album tracks (with internal retries per track)
-        dl_tracks_info = await download_album(album_id)
+        async with get_bot_download_semaphore():
+            dl_tracks_info = await download_album(album_id)
         if not dl_tracks_info:  # Check if *any* tracks were successfully downloaded
             raise ValueError("Album download failed or returned no successful tracks.")
 
@@ -1604,7 +1614,8 @@ async def handle_playlist_link(event: types.Message, real_link=None):
     download_dir_to_clean = None
 
     try:
-        dl_tracks_info = await download_playlist(playlist_id)
+        async with get_bot_download_semaphore():
+            dl_tracks_info = await download_playlist(playlist_id)
         if not dl_tracks_info:
             raise ValueError("Le téléchargement de la playlist a échoué.")
 

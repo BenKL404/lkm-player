@@ -5,7 +5,7 @@ from aiogram import F, Router, types
 from aiogram.types import BufferedInputFile, FSInputFile
 
 from dl_utils.yt_download import download_yt_dlp
-from utils import __, is_downloading, add_downloading, remove_downloading
+from utils import __, is_downloading, add_downloading, remove_downloading, get_bot_download_semaphore
 
 youtube_router = Router()
 soundcloud_router = Router()
@@ -29,7 +29,8 @@ async def get_youtube_audio(event: types.Message):
         song_path = None
         try:
             # Download and extract metadata using generic module
-            result = await download_yt_dlp(event.text, is_soundcloud=False)
+            async with get_bot_download_semaphore():
+                result = await download_yt_dlp(event.text, is_soundcloud=False)
             song_path = result["song_path"]
 
             # Send cover
@@ -121,7 +122,8 @@ async def get_soundcloud_audio(event: types.Message):
         song_path = None
         try:
             # Download and extract metadata using generic module
-            result = await download_yt_dlp(event.text, is_soundcloud=True)
+            async with get_bot_download_semaphore():
+                result = await download_yt_dlp(event.text, is_soundcloud=True)
             song_path = result["song_path"]
 
             # Send cover

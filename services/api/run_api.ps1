@@ -2,7 +2,7 @@
 $envFile = Join-Path $PSScriptRoot "token.env"
 if (-not (Test-Path $envFile)) {
     Write-Host "Erreur: token.env introuvable. Créez-le à partir de token.env.example" -ForegroundColor Red
-    exit 1
+    exit 1 
 }
 Get-Content $envFile | ForEach-Object {
     $line = $_.Trim()

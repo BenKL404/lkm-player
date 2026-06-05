@@ -296,7 +296,7 @@ async def search(
     tags=["Deezer - Métadonnées & Pochettes"],
     response_model=Dict[str, Any],
 )
-async def track_meta(
+def track_meta(
     track_id: str = FastAPIPath(..., description="ID unique du morceau Deezer ou URL complète"),
 ):
     tid = _extract_id(track_id, TRACK_REGEX) or track_id
@@ -317,7 +317,7 @@ async def track_meta(
     tags=["Deezer - Métadonnées & Pochettes"],
     response_model=Dict[str, Any],
 )
-async def album_meta(
+def album_meta(
     album_id: str = FastAPIPath(..., description="ID unique de l'album Deezer ou URL complète"),
 ):
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
@@ -338,7 +338,7 @@ async def album_meta(
     tags=["Deezer - Métadonnées & Pochettes"],
     response_model=AlbumTracksResponse,
 )
-async def album_tracks(
+def album_tracks(
     album_id: str = FastAPIPath(..., description="ID unique de l'album Deezer ou URL complète"),
 ):
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
@@ -384,7 +384,7 @@ async def album_tracks(
     tags=["Deezer - Métadonnées & Pochettes"],
     response_model=Dict[str, Any],
 )
-async def playlist_meta(
+def playlist_meta(
     playlist_id: str = FastAPIPath(..., description="ID unique de la playlist Deezer ou URL complète"),
 ):
     pid = _extract_id(playlist_id, PLAYLIST_REGEX) or playlist_id
@@ -407,7 +407,7 @@ async def playlist_meta(
         200: {"content": {"image/jpeg": {}}, "description": "Fichier image JPEG de la pochette."}
     },
 )
-async def track_cover(
+def track_cover(
     track_id: str = FastAPIPath(..., description="ID unique du morceau Deezer ou URL complète"),
 ):
     tid = _extract_id(track_id, TRACK_REGEX) or track_id
@@ -437,10 +437,9 @@ async def track_cover(
         200: {"content": {"image/jpeg": {}}, "description": "Fichier image JPEG de la pochette."}
     },
 )
-async def album_cover(
+def album_cover(
     album_id: str = FastAPIPath(..., description="ID unique de l'album Deezer ou URL complète"),
 ):
-    aid = _extract_id(album_id, PLAYLIST_REGEX) or album_id  # fallback
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
     try:
         meta = get_album_metadata_from_api(aid)
@@ -463,7 +462,7 @@ async def album_cover(
         200: {"content": {"image/jpeg": {}}, "description": "Fichier image JPEG de la pochette."}
     },
 )
-async def playlist_cover(
+def playlist_cover(
     playlist_id: str = FastAPIPath(..., description="ID unique de la playlist Deezer ou URL complète"),
 ):
     pid = _extract_id(playlist_id, PLAYLIST_REGEX) or playlist_id

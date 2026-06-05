@@ -34,6 +34,16 @@ async def download_yt_dlp(url: str, is_soundcloud: bool = False) -> dict:
     Downloads audio from YouTube or SoundCloud, extracts metadata,
     downloads and crops thumbnail, tags the MP3 file, and returns metadata and path.
     """
+    if is_soundcloud:
+        import urllib.parse
+        import re
+        url = urllib.parse.unquote(url)
+        if "api.soundcloud.com" in url or "soundcloud:" in url or url.strip().isdigit():
+            match = re.search(r'(?:tracks/|tracks:|track:|soundcloud:|^)(\d+)', url)
+            if match:
+                track_id = match.group(1)
+                url = f"https://w.soundcloud.com/player/?url=https%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F{track_id}"
+
     tmp_dir = SC_TMP_DIR if is_soundcloud else YT_TMP_DIR
     ydl_opts = {
         "outtmpl": str(tmp_dir / "%(id)s.%(ext)s"),
@@ -47,14 +57,37 @@ async def download_yt_dlp(url: str, is_soundcloud: bool = False) -> dict:
         ],
         "quiet": True,
         "no_warnings": True,
+        "js_runtimes": {"node": {}, "deno": {}, "bun": {}, "quickjs": {}},
     }
+
+    # Support specifying ffmpeg location
+    ffmpeg_location = os.environ.get("FFMPEG_LOCATION")
+    if not ffmpeg_location:
+        # Check standard relative directory (e.g. services/api/bin/)
+        api_dir = Path(__file__).resolve().parent.parent
+        bin_dir = api_dir / "bin"
+        if (bin_dir / "ffmpeg.exe").exists() or (bin_dir / "ffmpeg").exists():
+            ffmpeg_location = str(bin_dir)
+
+    if ffmpeg_location:
+        ydl_opts["ffmpeg_location"] = ffmpeg_location
 
     if not is_soundcloud and COOKIES_PATH and os.path.exists(COOKIES_PATH) and os.path.isfile(COOKIES_PATH) and os.path.getsize(COOKIES_PATH) > 0:
         ydl_opts["cookiefile"] = COOKIES_PATH
 
     # Download file in executor
     ydl = YoutubeDL(ydl_opts)
-    dict_info = await asyncio.to_thread(ydl.extract_info, url, download=True)
+    try:
+        dict_info = await asyncio.to_thread(ydl.extract_info, url, download=True)
+    except Exception as e:
+        err_msg = str(e)
+        if "ffmpeg" in err_msg.lower() or "ffprobe" in err_msg.lower():
+            raise RuntimeError(
+                "ffmpeg/ffprobe is not installed or not found. "
+                "Please configure FFMPEG_LOCATION in your token.env file or add ffmpeg/ffprobe to your system PATH."
+            ) from e
+        raise e
+
     if not dict_info:
         raise ValueError("Could not extract media info or download failed")
 
@@ -147,6 +180,7 @@ async def yt_dlp_search(query: str, service: str = "youtube", max_results: int =
         "no_warnings": True,
         "extract_flat": True,
         "skip_download": True,
+        "js_runtimes": {"node": {}, "deno": {}, "bun": {}, "quickjs": {}},
     }
     prefix = "scsearch" if service == "soundcloud" else "ytsearch"
     search_query = f"{prefix}{max_results}:{query}"
@@ -178,13 +212,18 @@ async def yt_dlp_search(query: str, service: str = "youtube", max_results: int =
                 except (ValueError, TypeError):
                     pass
 
+            if service == "soundcloud":
+                url_val = entry.get("webpage_url") or entry.get("url")
+            else:
+                url_val = entry.get("url") or entry.get("webpage_url") or f"https://www.youtube.com/watch?v={entry.get('id')}"
+
             results.append({
                 "id": entry.get("id") or "",
                 "id_type": service,
                 "title": title,
                 "artist": artist,
                 "img_url": entry.get("thumbnail") or "",
-                "url": entry.get("url") or entry.get("webpage_url") or f"https://www.youtube.com/watch?v={entry.get('id')}",
+                "url": url_val,
                 "duration": duration_val,
             })
     return results

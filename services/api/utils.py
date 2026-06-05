@@ -29,3 +29,15 @@ def add_downloading(user_id):
 
 def remove_downloading(user_id):
     DOWNLOADING_USERS.remove(user_id)
+
+
+_bot_download_semaphore = None
+
+def get_bot_download_semaphore():
+    global _bot_download_semaphore
+    if _bot_download_semaphore is None:
+        import asyncio
+        max_downloads = int(os.environ.get("MAX_CONCURRENT_DOWNLOADS", "3"))
+        _bot_download_semaphore = asyncio.Semaphore(max_downloads)
+    return _bot_download_semaphore
+
