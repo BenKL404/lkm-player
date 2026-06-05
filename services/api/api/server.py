@@ -29,7 +29,7 @@ def _load_token_env():
 
 _load_token_env()
 
-from fastapi import FastAPI, HTTPException, Query, Path, BackgroundTasks, APIRouter
+from fastapi import FastAPI, HTTPException, Query, Path as FastAPIPath, BackgroundTasks, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
@@ -297,7 +297,7 @@ async def search(
     response_model=Dict[str, Any],
 )
 async def track_meta(
-    track_id: str = Path(..., description="ID unique du morceau Deezer ou URL complète"),
+    track_id: str = FastAPIPath(..., description="ID unique du morceau Deezer ou URL complète"),
 ):
     tid = _extract_id(track_id, TRACK_REGEX) or track_id
     try:
@@ -318,7 +318,7 @@ async def track_meta(
     response_model=Dict[str, Any],
 )
 async def album_meta(
-    album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
+    album_id: str = FastAPIPath(..., description="ID unique de l'album Deezer ou URL complète"),
 ):
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
     try:
@@ -339,7 +339,7 @@ async def album_meta(
     response_model=AlbumTracksResponse,
 )
 async def album_tracks(
-    album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
+    album_id: str = FastAPIPath(..., description="ID unique de l'album Deezer ou URL complète"),
 ):
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
     try:
@@ -385,7 +385,7 @@ async def album_tracks(
     response_model=Dict[str, Any],
 )
 async def playlist_meta(
-    playlist_id: str = Path(..., description="ID unique de la playlist Deezer ou URL complète"),
+    playlist_id: str = FastAPIPath(..., description="ID unique de la playlist Deezer ou URL complète"),
 ):
     pid = _extract_id(playlist_id, PLAYLIST_REGEX) or playlist_id
     try:
@@ -408,7 +408,7 @@ async def playlist_meta(
     },
 )
 async def track_cover(
-    track_id: str = Path(..., description="ID unique du morceau Deezer ou URL complète"),
+    track_id: str = FastAPIPath(..., description="ID unique du morceau Deezer ou URL complète"),
 ):
     tid = _extract_id(track_id, TRACK_REGEX) or track_id
     try:
@@ -438,7 +438,7 @@ async def track_cover(
     },
 )
 async def album_cover(
-    album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
+    album_id: str = FastAPIPath(..., description="ID unique de l'album Deezer ou URL complète"),
 ):
     aid = _extract_id(album_id, PLAYLIST_REGEX) or album_id  # fallback
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
@@ -464,7 +464,7 @@ async def album_cover(
     },
 )
 async def playlist_cover(
-    playlist_id: str = Path(..., description="ID unique de la playlist Deezer ou URL complète"),
+    playlist_id: str = FastAPIPath(..., description="ID unique de la playlist Deezer ou URL complète"),
 ):
     pid = _extract_id(playlist_id, PLAYLIST_REGEX) or playlist_id
     try:
@@ -489,7 +489,7 @@ async def playlist_cover(
     response_class=FileResponse,
 )
 async def download_track_file(
-    track_id: str = Path(..., description="ID unique du morceau Deezer ou URL complète"),
+    track_id: str = FastAPIPath(..., description="ID unique du morceau Deezer ou URL complète"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     tid = _extract_id(track_id, TRACK_REGEX) or track_id
@@ -525,7 +525,7 @@ async def download_track_file(
     response_class=FileResponse,
 )
 async def download_album_zip(
-    album_id: str = Path(..., description="ID unique de l'album Deezer ou URL complète"),
+    album_id: str = FastAPIPath(..., description="ID unique de l'album Deezer ou URL complète"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     aid = _extract_id(album_id, ALBUM_REGEX) or album_id
@@ -574,7 +574,7 @@ async def download_album_zip(
     response_class=FileResponse,
 )
 async def download_playlist_zip(
-    playlist_id: str = Path(..., description="ID unique de la playlist Deezer ou URL complète"),
+    playlist_id: str = FastAPIPath(..., description="ID unique de la playlist Deezer ou URL complète"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     pid = _extract_id(playlist_id, PLAYLIST_REGEX) or playlist_id
@@ -624,7 +624,7 @@ async def download_playlist_zip(
     response_class=FileResponse,
 )
 async def download_youtube(
-    video_id: str = Path(..., description="ID unique de la vidéo YouTube (ex: 'dQw4w9WgXcQ') ou URL complète"),
+    video_id: str = FastAPIPath(..., description="ID unique de la vidéo YouTube (ex: 'dQw4w9WgXcQ') ou URL complète"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     url = f"https://www.youtube.com/watch?v={video_id}" if not video_id.startswith("http") else video_id
