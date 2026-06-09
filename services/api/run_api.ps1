@@ -1,8 +1,8 @@
-# Charge token.env et lance le bot en local (Windows PowerShell)
+# Charge token.env et lance l'API REST en local (Windows PowerShell)
 $envFile = Join-Path $PSScriptRoot "token.env"
 if (-not (Test-Path $envFile)) {
     Write-Host "Erreur: token.env introuvable. Créez-le à partir de token.env.example" -ForegroundColor Red
-    exit 1
+    exit 1 
 }
 Get-Content $envFile | ForEach-Object {
     $line = $_.Trim()
@@ -13,4 +13,4 @@ Get-Content $envFile | ForEach-Object {
     }
 }
 Set-Location $PSScriptRoot
-python main.py
+& .\venv\Scripts\python -m uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload

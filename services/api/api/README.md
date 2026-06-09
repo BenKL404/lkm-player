@@ -1,76 +1,125 @@
-# API REST Telegramusic
+# API REST Telegramusic (V1)
 
-API HTTP pour utiliser la logique de téléchargement (Deezer) **depuis une application** (ex: Flutter, LKM Player) sans passer par le bot Telegram.
+API HTTP permettant d'utiliser la logique de recherche et de téléchargement de musique (Deezer, YouTube, SoundCloud) **depuis une application externe** (ex: Flutter, LKM Player) sans passer par le bot Telegram.
 
 ## Prérequis
 
-- `DEEZER_TOKEN` : cookie ARL Deezer (voir [Finding Your Deezer ARL Cookie](https://github.com/nathom/streamrip/wiki/Finding-Your-Deezer-ARL-Cookie))
-- Optionnel : `TELEGRAM_TOKEN` uniquement si vous lancez aussi le bot
+- `DEEZER_TOKEN` : cookie ARL Deezer (requis uniquement pour Deezer, voir [Finding Your Deezer ARL Cookie](https://github.com/nathom/streamrip/wiki/Finding-Your-Deezer-ARL-Cookie))
+- `COOKIES_PATH` : chemin optionnel vers un fichier `cookies.txt` pour contourner le blocage de YouTube
+- Optionnel : `TELEGRAM_TOKEN` uniquement si vous lancez aussi le bot Telegram
 
 ## Démarrer l’API
 
-Depuis la racine du projet Telegramusic :
+Depuis la racine du projet :
 
 ```bash
 # Windows (PowerShell)
-$env:DEEZER_TOKEN = "votre_arl_cookie"
-uvicorn api.server:app --host 0.0.0.0 --port 8000
+python -m uvicorn api.server:app --host 0.0.0.0 --port 8000
 
 # Linux / macOS
-export DEEZER_TOKEN=your_arl_cookie
-uvicorn api.server:app --host 0.0.0.0 --port 8000
+python -m uvicorn api.server:app --host 0.0.0.0 --port 8000
 ```
 
-- **Docs interactives** : http://localhost:8000/docs  
+- **Docs interactives Swagger** : http://localhost:8000/docs  
 - **Résumé des routes** : http://localhost:8000/
 
-## Endpoints
+---
+
+## Liste des Endpoints (V1)
+
+### 🔍 Recherche Unifiée (Multi-Sources)
 
 | Méthode | Route | Description |
 |--------|--------|-------------|
-| GET | `/api/search?q=...&type=track\|album` | Recherche Deezer (titres ou albums) |
-| GET | `/api/track/{id}/meta` | Métadonnées d’un morceau (sans téléchargement) |
-| GET | `/api/album/{id}/meta` | Métadonnées d’un album |
-| GET | `/api/playlist/{id}/meta` | Métadonnées d’une playlist |
-| GET | `/api/download/track/{id}` | Télécharge le morceau (fichier audio) |
-| GET | `/api/download/album/{id}` | Télécharge l’album (ZIP) |
-| GET | `/api/download/playlist/{id}` | Télécharge la playlist (ZIP) |
+| GET | `/api/v1/search?q=...&provider=all\|deezer\|youtube\|soundcloud` | Recherche sur une ou toutes les sources en parallèle |
 
-`{id}` peut être l’ID Deezer seul (ex: `123456`) ou une URL Deezer (ex: `https://www.deezer.com/track/123456`).
+### 📀 Deezer (Métadonnées & Pochettes)
 
-## Exemples pour ton app Flutter
+| Méthode | Route | Description |
+|--------|--------|-------------|
+| GET | `/api/v1/deezer/track/{id}/meta` | Métadonnées d’un morceau |
+| GET | `/api/v1/deezer/track/{id}/cover` | Pochette JPEG d'un morceau |
+| GET | `/api/v1/deezer/album/{id}/meta` | Métadonnées d’un album |
+| GET | `/api/v1/deezer/album/{id}/tracks` | Liste des pistes formatées d'un album |
+| GET | `/api/v1/deezer/album/{id}/cover` | Pochette JPEG d'un album |
+| GET | `/api/v1/deezer/playlist/{id}/meta` | Métadonnées d’une playlist |
+| GET | `/api/v1/deezer/playlist/{id}/cover` | Pochette JPEG d'une playlist |
 
-### Recherche
+### 📥 Téléchargements
 
-```http
-GET http://localhost:8000/api/search?q=adele+hello&type=track
+| Méthode | Route | Description |
+|--------|--------|-------------|
+| GET | `/api/v1/deezer/track/{id}/download` | Télécharge un morceau Deezer (MP3 ou FLAC) |
+| GET | `/api/v1/deezer/album/{id}/download` | Télécharge un album Deezer complet (archive ZIP) |
+| GET | `/api/v1/deezer/playlist/{id}/download` | Télécharge une playlist Deezer (archive ZIP) |
+| GET | `/api/v1/youtube/{video_id}/download` | Télécharge le flux audio d'une vidéo YouTube (MP3) |
+| GET | `/api/v1/soundcloud/download?url=...` | Télécharge un titre SoundCloud par URL (MP3) |
+
+> 📌 `{id}` peut être l’ID seul (ex: `823267272` pour Deezer ou `dQw4w9WgXcQ` pour YouTube) ou l’URL complète.
+
+---
+
+## Formats des Réponses JSON
+
+### Recherche Unifiée (`/api/v1/search`)
+
+#### Exemple 1 : Recherche globale (`provider=all` par défaut)
+```json
+{
+  "source": "all",
+  "deezer": {
+    "tracks": [
+      {
+        "id": "110190530",
+        "id_type": "track",
+        "title": "Hello",
+        "artist": "Adele",
+        "album": "25",
+        "img_url": "https://e-cdns-images.dzcdn.net/images/cover/..."
+      }
+    ],
+    "albums": []
+  },
+  "youtube": [
+    {
+      "id": "YQHsXMglC9A",
+      "id_type": "youtube",
+      "title": "Adele - Hello (Official Music Video)",
+      "artist": "Adele",
+      "img_url": "https://i.ytimg.com/vi/YQHsXMglC9A/hqdefault.jpg",
+      "url": "https://www.youtube.com/watch?v=YQHsXMglC9A",
+      "duration": 367
+    }
+  ],
+  "soundcloud": []
+}
 ```
 
-Réponse JSON : `{ "query": "adele hello", "type": "track", "results": [ { "id": "...", "title": "...", "artist": "...", ... } ] }`
-
-### Téléchargement d’un morceau
-
-```http
-GET http://localhost:8000/api/download/track/823267272
+#### Exemple 2 : Recherche ciblée YouTube (`provider=youtube`)
+```json
+{
+  "source": "youtube",
+  "youtube": [
+    {
+      "id": "YQHsXMglC9A",
+      "id_type": "youtube",
+      "title": "Adele - Hello (Official Music Video)",
+      "artist": "Adele",
+      "img_url": "https://i.ytimg.com/vi/YQHsXMglC9A/hqdefault.jpg",
+      "url": "https://www.youtube.com/watch?v=YQHsXMglC9A",
+      "duration": 367
+    }
+  ]
+}
 ```
 
-Réponse : fichier binaire (MP3 ou FLAC) avec en-tête `Content-Disposition` pour le nom du fichier.
+---
 
-Dans Flutter, utiliser par ex. `http.get()` ou `dio` sur cette URL et écrire les bytes dans un fichier local, puis ouvrir avec ton lecteur (ex: `just_audio`).
+## Spécificités de Conception
 
-### Métadonnées (pour afficher avant téléchargement)
+### ⚡ Concurrence et Sémaphore
+L'API REST limite les téléchargements simultanés à **3 requêtes concurrentes** par défaut (configurable via `MAX_CONCURRENT_DOWNLOADS` dans `token.env`).
 
-```http
-GET http://localhost:8000/api/track/823267272/meta
-```
-
-Réponse JSON : titre, artiste, album, année, `cover_url` (route pour récupérer la pochette), etc.
-
-## CORS
-
-L’API autorise toutes les origines (`allow_origins=["*"]`) pour que ton app Flutter (ou une autre origine) puisse l’appeler. En production, restreindre si besoin.
-
-## Note
-
-- Un seul téléchargement à la fois côté API (verrou) pour éviter de surcharger Deezer.
-- Les fichiers temporaires sont nettoyés après envoi (track après ~10 s, ZIP après envoi).
+### 🧹 Nettoyage automatique
+- **En cours d'exécution** : Les fichiers temporaires sont effacés du disque via les `BackgroundTasks` de FastAPI dès que le transfert réseau avec le client est complété.
+- **Au démarrage** : Le dossier temporaire `tmp/` est vidé au boot du serveur API.

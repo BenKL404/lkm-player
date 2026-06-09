@@ -67,3 +67,4 @@ key.properties
 # ===== Temp / Local =====
 **/local_resources/
 tmp/
+services/api/bin/
