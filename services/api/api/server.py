@@ -52,8 +52,8 @@ from dl_utils.deezer_download import (
     get_song_url,
     calcbfkey,
     blowfishDecrypt,
-    session as deezer_session,
 )
+import dl_utils.deezer_download as dd
 from dl_utils.yt_download import download_yt_dlp, yt_dlp_search
 from utils import TMP_DIR, SimpleTTLCache, SimpleAsyncTTLCache
 
@@ -75,13 +75,17 @@ search_cache = SimpleAsyncTTLCache(300)
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
-async def verify_api_key(header_value: str = Security(api_key_header)):
+async def verify_api_key(
+    header_value: Optional[str] = Security(api_key_header),
+    api_key: Optional[str] = Query(None, description="Clé API (alternative au header X-API-Key, utile pour les balises <audio>)")
+):
     expected_key = os.environ.get("API_KEY")
-    if expected_key and header_value != expected_key:
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: Invalid or missing API Key"
-        )
+    if expected_key:
+        if header_value != expected_key and api_key != expected_key:
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: Invalid or missing API Key"
+            )
 
 
 # ---------- Modèles de données Pydantic (OpenAPI Schemas) ----------
@@ -723,8 +727,6 @@ async def download_soundcloud(
         )
 
 
-# Inclure le routeur V1 dans l'application
-app.include_router(router)
 
 
 # ---------- Streaming (V1) ----------
@@ -737,8 +739,11 @@ def _get_deezer_stream_generator(song_id: str, track_token: str, format_name: st
     url = get_song_url(track_token, format_name)
     key = calcbfkey(song_id)
     
-    # Nous utilisons la session Deezer globale pour récupérer le morceau en streaming
-    with deezer_session.get(url, stream=True) as response:
+    if not dd.session:
+        raise HTTPException(status_code=500, detail="Deezer session not initialized")
+    
+    # Nous utilisons la session Deezer globale (dynamique) pour récupérer le morceau en streaming
+    with dd.session.get(url, stream=True) as response:
         response.raise_for_status()
         i = 0
         block_size = 2048
@@ -764,21 +769,27 @@ def _get_deezer_stream_generator(song_id: str, track_token: str, format_name: st
 )
 async def stream_deezer_track(
     track_id: str = FastAPIPath(..., description="ID unique du morceau Deezer ou URL complète"),
-    format: str = Query("MP3_128", regex="^(MP3_128|MP3_320|FLAC)$", description="Format audio demandé"),
 ):
     tid = _extract_id(track_id, TRACK_REGEX) or track_id
     try:
-        # Récupération des métadonnées (bénéficie du cache TTL de 10 min)
-        meta = get_track_metadata_from_api(tid)
-        song_id = meta.get("SNG_ID")
-        track_token = meta.get("TRACK_TOKEN")
+        # Récupération des métadonnées internes pour avoir SNG_ID et TRACK_TOKEN via le scraper du site
+        # car l'API publique (get_track_metadata_from_api) ne fournit pas ces tokens.
+        track_infos = dd.get_song_infos_from_deezer_website(dd.TYPE_TRACK, tid)
+        if isinstance(track_infos, list):
+            track_infos = track_infos[0] if len(track_infos) > 0 else {}
+            
+        song_id = track_infos.get("SNG_ID")
+        track_token = track_infos.get("TRACK_TOKEN")
         if not song_id or not track_token:
             raise HTTPException(status_code=404, detail="Impossible de récupérer les tokens de streaming du morceau")
         
-        media_type = "audio/mpeg" if format != "FLAC" else "audio/flac"
+        # Utiliser la méthode officielle pour obtenir le format autorisé par notre ARL
+        file_ext, actual_format = dd.get_file_format(track_infos)
+        
+        media_type = "audio/mpeg" if actual_format != "FLAC" else "audio/flac"
         
         return StreamingResponse(
-            _get_deezer_stream_generator(song_id, track_token, format),
+            _get_deezer_stream_generator(song_id, track_token, actual_format),
             media_type=media_type,
         )
     except Exception as e:
@@ -796,23 +807,24 @@ async def stream_youtube_track(
 ):
     url = f"https://www.youtube.com/watch?v={video_id}" if not video_id.startswith("http") else video_id
     
-    async def play_audio_stream():
+    def play_audio_stream():
         # Utiliser yt-dlp pour extraire le meilleur flux audio vers stdout
+        import subprocess
         cmd = [
             "yt-dlp",
             "-f", "bestaudio",
             "-o", "-",  # Écriture directe sur stdout
             url
         ]
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL
         )
         
         try:
             while True:
-                chunk = await process.stdout.read(4096)
+                chunk = process.stdout.read(4096)
                 if not chunk:
                     break
                 yield chunk
@@ -820,9 +832,9 @@ async def stream_youtube_track(
             # S'assurer de terminer le processus proprement
             try:
                 process.terminate()
-            except ProcessLookupError:
-                pass
-            await process.wait()
+                process.wait(timeout=2)
+            except Exception:
+                process.kill()
 
     return StreamingResponse(play_audio_stream(), media_type="audio/webm")
 
@@ -836,33 +848,38 @@ async def stream_youtube_track(
 async def stream_soundcloud_track(
     url: str = Query(..., description="URL complète du titre SoundCloud"),
 ):
-    async def play_audio_stream():
+    def play_audio_stream():
+        import subprocess
         cmd = [
             "yt-dlp",
             "-f", "bestaudio",
             "-o", "-",
             url
         ]
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL
         )
         
         try:
             while True:
-                chunk = await process.stdout.read(4096)
+                chunk = process.stdout.read(4096)
                 if not chunk:
                     break
                 yield chunk
         finally:
             try:
                 process.terminate()
-            except ProcessLookupError:
-                pass
-            await process.wait()
+                process.wait(timeout=2)
+            except Exception:
+                process.kill()
 
     return StreamingResponse(play_audio_stream(), media_type="audio/webm")
+
+
+# Inclure le routeur V1 dans l'application (après l'ajout de toutes les routes)
+app.include_router(router)
 
 
 # ---------- Accueil ----------
