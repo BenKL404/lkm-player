@@ -17,6 +17,10 @@ Exemple minimal :
 DEEZER_TOKEN=VOTRE_ARL_DEEZER
 TELEGRAM_TOKEN=VOTRE_TOKEN_BOT
 BOT_LANG=fr
+
+# Optionnel (sécurité et limites de l'API REST)
+# API_KEY=ma_cle_secrete_123
+# MAX_CONCURRENT_DOWNLOADS=3
 ```
 
 Optionnel (YouTube) : place un `cookies.txt` dans `services/api/local_resources/` (voir la doc `yt-dlp`).

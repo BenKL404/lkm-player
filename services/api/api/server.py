@@ -29,9 +29,11 @@ def _load_token_env():
 
 _load_token_env()
 
-from fastapi import FastAPI, HTTPException, Query, Path as FastAPIPath, BackgroundTasks, APIRouter
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Query, Path as FastAPIPath, BackgroundTasks, APIRouter, Security, Depends
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 # Import de la logique métier (handlers.deezer initialise la session Deezer au chargement)
@@ -43,13 +45,43 @@ from handlers.deezer import (
     get_playlist_metadata_from_api,
     get_track_metadata_from_api,
 )
-from dl_utils.deezer_download import TYPE_ALBUM, TYPE_TRACK, deezer_search
+from dl_utils.deezer_download import (
+    TYPE_ALBUM,
+    TYPE_TRACK,
+    deezer_search,
+    get_song_url,
+    calcbfkey,
+    blowfishDecrypt,
+    session as deezer_session,
+)
 from dl_utils.yt_download import download_yt_dlp, yt_dlp_search
-from utils import TMP_DIR
+from utils import TMP_DIR, SimpleTTLCache, SimpleAsyncTTLCache
 
 # Sémaphore pour limiter le nombre de téléchargements concurrents côté API
 MAX_CONCURRENT_DOWNLOADS = int(os.environ.get("MAX_CONCURRENT_DOWNLOADS", "3"))
 _download_semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+
+# Caches pour l'API REST
+# Métadonnées (durée de vie : 10 minutes)
+metadata_cache = SimpleTTLCache(600)
+get_track_metadata_from_api = metadata_cache.decorator(get_track_metadata_from_api)
+get_album_metadata_from_api = metadata_cache.decorator(get_album_metadata_from_api)
+get_playlist_metadata_from_api = metadata_cache.decorator(get_playlist_metadata_from_api)
+
+# Recherches (durée de vie : 5 minutes)
+search_cache = SimpleAsyncTTLCache(300)
+
+# Authentification optionnelle par clé API
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+async def verify_api_key(header_value: str = Security(api_key_header)):
+    expected_key = os.environ.get("API_KEY")
+    if expected_key and header_value != expected_key:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Invalid or missing API Key"
+        )
 
 
 # ---------- Modèles de données Pydantic (OpenAPI Schemas) ----------
@@ -100,6 +132,26 @@ class GlobalSearchResponse(BaseModel):
 
 # ---------- Initialisation FastAPI ----------
 
+def _clean_temp_dir():
+    try:
+        import shutil
+        tmp_path = Path(TMP_DIR)
+        if tmp_path.exists():
+            for child in tmp_path.iterdir():
+                if child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    child.unlink(missing_ok=True)
+            print("Nettoyage au démarrage terminé avec succès.", flush=True)
+    except Exception as e:
+        print(f"Erreur lors du nettoyage au démarrage: {e}", flush=True)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Nettoyage du dossier de téléchargement temporaire...", flush=True)
+    _clean_temp_dir()
+    yield
+
 app = FastAPI(
     title="Telegramusic API",
     description=(
@@ -115,6 +167,7 @@ app = FastAPI(
         "name": "BenKL404",
         "url": "https://github.com/BenKL404/lkm-player",
     },
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -125,8 +178,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routeur versionné (V1)
-router = APIRouter(prefix="/api/v1")
+# Routeur versionné (V1) avec authentification optionnelle
+router = APIRouter(prefix="/api/v1", dependencies=[Depends(verify_api_key)])
 
 # Regex pour valider les IDs / liens Deezer
 TRACK_REGEX = re.compile(r"https?://(?:www\.)?deezer\.com/([a-z]*/)?track/(\d+)/?$")
@@ -158,26 +211,12 @@ def _cleanup_path(path_to_clean: Path):
         print(f"Erreur lors du nettoyage de {path_to_clean}: {e}", flush=True)
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Nettoyage du dossier temporaire lors du démarrage de l'API."""
-    print("Nettoyage du dossier de téléchargement temporaire...", flush=True)
-    try:
-        import shutil
-        tmp_path = Path(TMP_DIR)
-        if tmp_path.exists():
-            for child in tmp_path.iterdir():
-                if child.is_dir():
-                    shutil.rmtree(child, ignore_errors=True)
-                else:
-                    child.unlink(missing_ok=True)
-            print("Nettoyage au démarrage terminé avec succès.", flush=True)
-    except Exception as e:
-        print(f"Erreur lors du nettoyage au démarrage: {e}", flush=True)
+# Le nettoyage au démarrage est désormais géré par le gestionnaire de contexte lifespan
 
 
 # ---------- Fonctions d'Aide pour Recherche Parallèle ----------
 
+@search_cache.decorator
 async def _search_deezer_safe(query: str, search_type: str) -> list:
     try:
         loop = asyncio.get_running_loop()
@@ -188,6 +227,7 @@ async def _search_deezer_safe(query: str, search_type: str) -> list:
         print(f"Search - Deezer {search_type} error: {e}", flush=True)
         return []
 
+@search_cache.decorator
 async def _search_youtube_safe(query: str, limit: int) -> list:
     try:
         return await yt_dlp_search(query, service="youtube", max_results=limit)
@@ -195,6 +235,7 @@ async def _search_youtube_safe(query: str, limit: int) -> list:
         print(f"Search - YouTube error: {e}", flush=True)
         return []
 
+@search_cache.decorator
 async def _search_soundcloud_safe(query: str, limit: int) -> list:
     try:
         return await yt_dlp_search(query, service="soundcloud", max_results=limit)
@@ -686,6 +727,144 @@ async def download_soundcloud(
 app.include_router(router)
 
 
+# ---------- Streaming (V1) ----------
+
+def _get_deezer_stream_generator(song_id: str, track_token: str, format_name: str):
+    """
+    Générateur synchrone pour lire, décrypter bloc par bloc et diffuser
+    un morceau Deezer en direct.
+    """
+    url = get_song_url(track_token, format_name)
+    key = calcbfkey(song_id)
+    
+    # Nous utilisons la session Deezer globale pour récupérer le morceau en streaming
+    with deezer_session.get(url, stream=True) as response:
+        response.raise_for_status()
+        i = 0
+        block_size = 2048
+        for chunk in response.iter_content(chunk_size=block_size):
+            if not chunk:
+                break
+            
+            is_encrypted = (i % 3) == 0
+            is_whole_block = len(chunk) == block_size
+
+            if is_encrypted and is_whole_block:
+                chunk = blowfishDecrypt(chunk, key)
+            
+            yield chunk
+            i += 1
+
+
+@router.get(
+    "/deezer/track/{track_id}/stream",
+    summary="Diffuser un morceau Deezer en direct (Streaming)",
+    description="Décrypte à la volée en mémoire et diffuse le flux audio d'un morceau Deezer sans écriture disque.",
+    tags=["Streaming"],
+)
+async def stream_deezer_track(
+    track_id: str = FastAPIPath(..., description="ID unique du morceau Deezer ou URL complète"),
+    format: str = Query("MP3_128", regex="^(MP3_128|MP3_320|FLAC)$", description="Format audio demandé"),
+):
+    tid = _extract_id(track_id, TRACK_REGEX) or track_id
+    try:
+        # Récupération des métadonnées (bénéficie du cache TTL de 10 min)
+        meta = get_track_metadata_from_api(tid)
+        song_id = meta.get("SNG_ID")
+        track_token = meta.get("TRACK_TOKEN")
+        if not song_id or not track_token:
+            raise HTTPException(status_code=404, detail="Impossible de récupérer les tokens de streaming du morceau")
+        
+        media_type = "audio/mpeg" if format != "FLAC" else "audio/flac"
+        
+        return StreamingResponse(
+            _get_deezer_stream_generator(song_id, track_token, format),
+            media_type=media_type,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erreur de streaming : {str(e)}")
+
+
+@router.get(
+    "/youtube/{video_id}/stream",
+    summary="Diffuser le flux audio d'une vidéo YouTube (Streaming)",
+    description="Redirige en temps réel le flux audio d'une vidéo YouTube via yt-dlp.",
+    tags=["Streaming"],
+)
+async def stream_youtube_track(
+    video_id: str = FastAPIPath(..., description="ID de la vidéo YouTube (ex: 'dQw4w9WgXcQ') ou URL complète"),
+):
+    url = f"https://www.youtube.com/watch?v={video_id}" if not video_id.startswith("http") else video_id
+    
+    async def play_audio_stream():
+        # Utiliser yt-dlp pour extraire le meilleur flux audio vers stdout
+        cmd = [
+            "yt-dlp",
+            "-f", "bestaudio",
+            "-o", "-",  # Écriture directe sur stdout
+            url
+        ]
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL
+        )
+        
+        try:
+            while True:
+                chunk = await process.stdout.read(4096)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            # S'assurer de terminer le processus proprement
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
+            await process.wait()
+
+    return StreamingResponse(play_audio_stream(), media_type="audio/webm")
+
+
+@router.get(
+    "/soundcloud/stream",
+    summary="Diffuser un morceau SoundCloud (Streaming)",
+    description="Redirige en temps réel le flux audio d'un morceau SoundCloud via yt-dlp.",
+    tags=["Streaming"],
+)
+async def stream_soundcloud_track(
+    url: str = Query(..., description="URL complète du titre SoundCloud"),
+):
+    async def play_audio_stream():
+        cmd = [
+            "yt-dlp",
+            "-f", "bestaudio",
+            "-o", "-",
+            url
+        ]
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL
+        )
+        
+        try:
+            while True:
+                chunk = await process.stdout.read(4096)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
+            await process.wait()
+
+    return StreamingResponse(play_audio_stream(), media_type="audio/webm")
+
+
 # ---------- Accueil ----------
 
 @app.get(
@@ -703,6 +882,7 @@ async def root():
             "deezer_track_meta": "GET /api/v1/deezer/track/{id}/meta",
             "deezer_track_cover": "GET /api/v1/deezer/track/{id}/cover",
             "deezer_track_download": "GET /api/v1/deezer/track/{id}/download",
+            "deezer_track_stream": "GET /api/v1/deezer/track/{id}/stream?format=MP3_128|MP3_320|FLAC",
             "deezer_album_meta": "GET /api/v1/deezer/album/{id}/meta",
             "deezer_album_tracks": "GET /api/v1/deezer/album/{id}/tracks",
             "deezer_album_cover": "GET /api/v1/deezer/album/{id}/cover",
@@ -711,7 +891,9 @@ async def root():
             "deezer_playlist_cover": "GET /api/v1/deezer/playlist/{id}/cover",
             "deezer_playlist_download": "GET /api/v1/deezer/playlist/{id}/download",
             "youtube_download": "GET /api/v1/youtube/{video_id}/download",
+            "youtube_stream": "GET /api/v1/youtube/{video_id}/stream",
             "soundcloud_download": "GET /api/v1/soundcloud/download?url=...",
+            "soundcloud_stream": "GET /api/v1/soundcloud/stream?url=...",
         },
     }
 
