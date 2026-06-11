@@ -115,6 +115,32 @@ Les cinq étapes du plan d'action de correction du backend ont été entièremen
   - **SoundCloud** : 
     - Téléchargement MP3 : `GET /api/v1/soundcloud/download?url=...`
 
+### 9. Déblocage complet de la boucle d'événements (Event Loop)
+* **Fichier modifié** : [handlers/deezer.py](file:///D:/PROJETS/lkm-player/services/api/handlers/deezer.py)
+* **Description** : Les opérations d'écriture de fichiers et de téléchargements synchrones de morceaux via `download_song()` ont été migrées vers des threads séparés en utilisant `asyncio.to_thread`.
+* **Résultat** : Le serveur ne bloque plus lors des téléchargements lourds, permettant à d'autres utilisateurs de faire des recherches et requêtes de métadonnées de manière totalement fluide en parallèle.
+
+### 10. Cache en mémoire à expiration (TTL Cache)
+* **Fichiers modifiés** : [utils.py](file:///D:/PROJETS/lkm-player/services/api/utils.py), [api/server.py](file:///D:/PROJETS/lkm-player/services/api/api/server.py)
+* **Description** : Ajout de classes de cache en mémoire pour stocker les résultats temporaires :
+  - `SimpleTTLCache` pour les requêtes synchrones de métadonnées et pochettes (durée : 10 min).
+  - `SimpleAsyncTTLCache` pour les requêtes de recherche unifiée (durée : 5 min).
+* **Résultat** : Réduction drastique des temps de réponse lors de navigations répétées dans l'application mobile et limitation du nombre de requêtes sortantes vers Deezer/YouTube.
+
+### 11. Concurrence interne régulée pour les albums et playlists
+* **Fichier modifié** : [handlers/deezer.py](file:///D:/PROJETS/lkm-player/services/api/handlers/deezer.py)
+* **Description** : Introduction d'un sémaphore interne de taille 3 limitant le nombre de morceaux téléchargés en parallèle au sein d'une même requête d'album ou de playlist.
+* **Résultat** : Prévention des erreurs réseau, des saturations d'I/O disque et des risques de bannissement Deezer liés à une avalanche de connexions concurrentes.
+
+### 12. Sécurisation par Clé API optionnelle
+* **Fichier modifié** : [api/server.py](file:///D:/PROJETS/lkm-player/services/api/api/server.py)
+* **Description** : Ajout d'un système de vérification d'en-tête HTTP `X-API-Key`.
+* **Résultat** : Permet de restreindre l'accès à l'ensemble de l'API REST aux seuls clients autorisés en renseignant la variable `API_KEY` dans le fichier `token.env`.
+
+### 13. Cycle de vie de l'application moderne via Lifespan
+* **Fichier modifié** : [api/server.py](file:///D:/PROJETS/lkm-player/services/api/api/server.py)
+* **Description** : Remplacement des gestionnaires d'événements obsolètes par le protocole `lifespan` asynchrone pour la préparation du dossier temporaire.
+
 ---
 
 ## 3. Évolution Future : Pagination des Recherches

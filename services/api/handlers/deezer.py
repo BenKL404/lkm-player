@@ -177,9 +177,9 @@ async def download_track(track_id, retries=MAX_RETRIES):
             song_path = tmp_track_base_dir / f"{track_id}{file_extension}"
 
             # Perform the actual download
-            download_song(
-                track_infos, deezer_format, str(song_path)
-            )  # download_song expects string path
+            await asyncio.to_thread(
+                download_song, track_infos, deezer_format, str(song_path)
+            )
 
             # Check if download was successful (e.g., file exists and has size)
             if not song_path.exists() or song_path.stat().st_size == 0:
@@ -311,12 +311,15 @@ async def download_album(album_id, retries=MAX_RETRIES):
 
         # Create a closure to capture loop variables correctly for async task
         # This inner function now includes the retry logic for a single track
+        track_semaphore = asyncio.Semaphore(3)
+
         async def download_single_with_retry(ti, fe, df, sp, track_retries=MAX_RETRIES):
             track_id = ti.get("SNG_ID", "N/A")
             for attempt in range(track_retries):
                 try:
-                    # Ensure download_song doesn't create its own conflicting temp dirs if possible
-                    download_song(ti, df, str(sp))  # download_song expects string path
+                    # Limit concurrency and use to_thread to keep it async and non-blocking
+                    async with track_semaphore:
+                        await asyncio.to_thread(download_song, ti, df, str(sp))
 
                     if not sp.exists() or sp.stat().st_size == 0:
                         # Clean up potentially empty file before retrying
@@ -461,11 +464,14 @@ async def download_playlist(playlist_id, retries=MAX_RETRIES):
         file_extension, deezer_format = get_file_format(track_infos)
         song_path = tmp_download_dir / f"{track_sng_id}{file_extension}"
 
+        track_semaphore = asyncio.Semaphore(3)
+
         async def download_single_with_retry(ti, fe, df, sp, track_retries=MAX_RETRIES):
             track_id = ti.get("SNG_ID", "N/A")
             for attempt in range(track_retries):
                 try:
-                    download_song(ti, df, str(sp))
+                    async with track_semaphore:
+                        await asyncio.to_thread(download_song, ti, df, str(sp))
                     if not sp.exists() or sp.stat().st_size == 0:
                         if sp.exists():
                             try:

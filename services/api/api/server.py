@@ -29,7 +29,9 @@ def _load_token_env():
 
 _load_token_env()
 
-from fastapi import FastAPI, HTTPException, Query, Path as FastAPIPath, BackgroundTasks, APIRouter
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Query, Path as FastAPIPath, BackgroundTasks, APIRouter, Security, Depends
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
@@ -45,11 +47,33 @@ from handlers.deezer import (
 )
 from dl_utils.deezer_download import TYPE_ALBUM, TYPE_TRACK, deezer_search
 from dl_utils.yt_download import download_yt_dlp, yt_dlp_search
-from utils import TMP_DIR
+from utils import TMP_DIR, SimpleTTLCache, SimpleAsyncTTLCache
 
 # Sémaphore pour limiter le nombre de téléchargements concurrents côté API
 MAX_CONCURRENT_DOWNLOADS = int(os.environ.get("MAX_CONCURRENT_DOWNLOADS", "3"))
 _download_semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+
+# Caches pour l'API REST
+# Métadonnées (durée de vie : 10 minutes)
+metadata_cache = SimpleTTLCache(600)
+get_track_metadata_from_api = metadata_cache.decorator(get_track_metadata_from_api)
+get_album_metadata_from_api = metadata_cache.decorator(get_album_metadata_from_api)
+get_playlist_metadata_from_api = metadata_cache.decorator(get_playlist_metadata_from_api)
+
+# Recherches (durée de vie : 5 minutes)
+search_cache = SimpleAsyncTTLCache(300)
+
+# Authentification optionnelle par clé API
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+async def verify_api_key(header_value: str = Security(api_key_header)):
+    expected_key = os.environ.get("API_KEY")
+    if expected_key and header_value != expected_key:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Invalid or missing API Key"
+        )
 
 
 # ---------- Modèles de données Pydantic (OpenAPI Schemas) ----------
@@ -100,6 +124,26 @@ class GlobalSearchResponse(BaseModel):
 
 # ---------- Initialisation FastAPI ----------
 
+def _clean_temp_dir():
+    try:
+        import shutil
+        tmp_path = Path(TMP_DIR)
+        if tmp_path.exists():
+            for child in tmp_path.iterdir():
+                if child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    child.unlink(missing_ok=True)
+            print("Nettoyage au démarrage terminé avec succès.", flush=True)
+    except Exception as e:
+        print(f"Erreur lors du nettoyage au démarrage: {e}", flush=True)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Nettoyage du dossier de téléchargement temporaire...", flush=True)
+    _clean_temp_dir()
+    yield
+
 app = FastAPI(
     title="Telegramusic API",
     description=(
@@ -115,6 +159,7 @@ app = FastAPI(
         "name": "BenKL404",
         "url": "https://github.com/BenKL404/lkm-player",
     },
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -125,8 +170,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routeur versionné (V1)
-router = APIRouter(prefix="/api/v1")
+# Routeur versionné (V1) avec authentification optionnelle
+router = APIRouter(prefix="/api/v1", dependencies=[Depends(verify_api_key)])
 
 # Regex pour valider les IDs / liens Deezer
 TRACK_REGEX = re.compile(r"https?://(?:www\.)?deezer\.com/([a-z]*/)?track/(\d+)/?$")
@@ -158,26 +203,12 @@ def _cleanup_path(path_to_clean: Path):
         print(f"Erreur lors du nettoyage de {path_to_clean}: {e}", flush=True)
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Nettoyage du dossier temporaire lors du démarrage de l'API."""
-    print("Nettoyage du dossier de téléchargement temporaire...", flush=True)
-    try:
-        import shutil
-        tmp_path = Path(TMP_DIR)
-        if tmp_path.exists():
-            for child in tmp_path.iterdir():
-                if child.is_dir():
-                    shutil.rmtree(child, ignore_errors=True)
-                else:
-                    child.unlink(missing_ok=True)
-            print("Nettoyage au démarrage terminé avec succès.", flush=True)
-    except Exception as e:
-        print(f"Erreur lors du nettoyage au démarrage: {e}", flush=True)
+# Le nettoyage au démarrage est désormais géré par le gestionnaire de contexte lifespan
 
 
 # ---------- Fonctions d'Aide pour Recherche Parallèle ----------
 
+@search_cache.decorator
 async def _search_deezer_safe(query: str, search_type: str) -> list:
     try:
         loop = asyncio.get_running_loop()
@@ -188,6 +219,7 @@ async def _search_deezer_safe(query: str, search_type: str) -> list:
         print(f"Search - Deezer {search_type} error: {e}", flush=True)
         return []
 
+@search_cache.decorator
 async def _search_youtube_safe(query: str, limit: int) -> list:
     try:
         return await yt_dlp_search(query, service="youtube", max_results=limit)
@@ -195,6 +227,7 @@ async def _search_youtube_safe(query: str, limit: int) -> list:
         print(f"Search - YouTube error: {e}", flush=True)
         return []
 
+@search_cache.decorator
 async def _search_soundcloud_safe(query: str, limit: int) -> list:
     try:
         return await yt_dlp_search(query, service="soundcloud", max_results=limit)

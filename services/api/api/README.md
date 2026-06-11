@@ -2,26 +2,77 @@
 
 API HTTP permettant d'utiliser la logique de recherche et de téléchargement de musique (Deezer, YouTube, SoundCloud) **depuis une application externe** (ex: Flutter, LKM Player) sans passer par le bot Telegram.
 
-## Prérequis
+## Guide de Premier Démarrage & Prérequis
 
-- `DEEZER_TOKEN` : cookie ARL Deezer (requis uniquement pour Deezer, voir [Finding Your Deezer ARL Cookie](https://github.com/nathom/streamrip/wiki/Finding-Your-Deezer-ARL-Cookie))
-- `COOKIES_PATH` : chemin optionnel vers un fichier `cookies.txt` pour contourner le blocage de YouTube
-- Optionnel : `TELEGRAM_TOKEN` uniquement si vous lancez aussi le bot Telegram
+Pour lancer l'API REST (et le bot) pour la première fois, suivez ces étapes :
 
-## Démarrer l’API
+### 1. Prérequis Système & Dépendances Externes
 
-Depuis la racine du projet :
+- **Python 3.13+** installé sur votre machine.
+- **FFmpeg** : Requis pour convertir les flux YouTube/SoundCloud et insérer les métadonnées ID3.
+  - *Windows* : Un script d'installation automatisé est fourni dans le dossier `services/api/` :
+    ```powershell
+    # Ouvrez PowerShell en Administrateur dans le dossier services/api/ et lancez :
+    .\setup_ffmpeg.ps1
+    ```
+  - *Linux (Ubuntu/Debian)* : `sudo apt update && sudo apt install ffmpeg`
+  - *macOS* : `brew install ffmpeg`
+
+### 2. Configuration du fichier d'environnement (`token.env`)
+
+Copiez le fichier `token.env.example` et renommez-le en `token.env` dans le dossier `services/api/`.
+
+Renseignez les variables nécessaires :
+- **`DEEZER_TOKEN`** (Requis pour Deezer) : Le cookie ARL de votre session Deezer.
+  - *Comment l'obtenir* : Connectez-vous à votre compte Deezer sur votre navigateur Web, ouvrez l'inspecteur d'éléments (F12) -> **Stockage / Application** -> **Cookies** -> `deezer.com`. Copiez la valeur du cookie nommé `arl` (longue chaîne de 192 caractères).
+- **`COOKIES_PATH`** (Optionnel) : Chemin absolu vers un fichier de cookies YouTube au format Netscape (pour contourner les limitations de requêtes de YouTube).
+- **`TELEGRAM_TOKEN`** (Optionnel) : Requis uniquement si vous lancez également le Bot Telegram (`main.py`).
+- **`API_KEY`** (Optionnel) : Clé de sécurité pour restreindre l'accès à l'API REST.
+- **`MAX_CONCURRENT_DOWNLOADS`** (Optionnel, défaut: `3`) : Limite globale de téléchargements simultanés sur le serveur.
+- **`FFMPEG_LOCATION`** (Optionnel) : Si ffmpeg n'est pas dans les variables d'environnement de votre système, indiquez le chemin absolu de son répertoire `bin/`.
+
+### 3. Installation et activation de l'Environnement Virtuel
+
+Dans le terminal, naviguez dans le dossier `services/api/` :
 
 ```bash
-# Windows (PowerShell)
-python -m uvicorn api.server:app --host 0.0.0.0 --port 8000
+# 1. Créer l'environnement virtuel (à faire une seule fois)
+python -m venv venv
 
-# Linux / macOS
-python -m uvicorn api.server:app --host 0.0.0.0 --port 8000
+# 2. Activer l'environnement virtuel (à chaque nouveau terminal)
+# - Windows (PowerShell) :
+.\venv\Scripts\Activate.ps1
+# - Windows (cmd) :
+.\venv\Scripts\activate.bat
+# - Linux / macOS :
+source venv/bin/activate
+
+# 3. Installer les dépendances du projet
+pip install -r requirements.txt
 ```
 
-- **Docs interactives Swagger** : http://localhost:8000/docs  
-- **Résumé des routes** : http://localhost:8000/
+### 4. Lancer l'API REST
+
+#### Via Uvicorn (Recommandé en développement)
+```bash
+# Avec rechargement automatique à chaque modification de code
+uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+#### Via scripts Windows fournis
+- Lancez `.\run_api.ps1` pour démarrer le serveur API REST sur le port 8000.
+- Lancez `.\run_bot.ps1` pour démarrer le bot Telegram.
+
+- **Documentation interactive Swagger** : [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Résumé des routes** : [http://localhost:8000/](http://localhost:8000/)
+
+## Sécurisation par Clé API (Optionnel)
+
+Si vous définissez la variable `API_KEY` dans votre fichier `token.env` (ex: `API_KEY=ma_cle_secrete_123`), toutes les requêtes adressées aux routes versionnées (sous `/api/v1/*`) devront obligatoirement inclure l'en-tête HTTP suivant :
+```http
+X-API-Key: ma_cle_secrete_123
+```
+Si l'en-tête est manquant ou incorrect, l'API renverra une réponse `403 Forbidden`. Si `API_KEY` n'est pas défini, la validation est ignorée et l'API reste publique.
 
 ---
 
@@ -117,9 +168,17 @@ python -m uvicorn api.server:app --host 0.0.0.0 --port 8000
 
 ## Spécificités de Conception
 
-### ⚡ Concurrence et Sémaphore
-L'API REST limite les téléchargements simultanés à **3 requêtes concurrentes** par défaut (configurable via `MAX_CONCURRENT_DOWNLOADS` dans `token.env`).
+### ⚡ Concurrence & Non-blocage
+- **Limitation globale** : L'API REST limite les requêtes de téléchargement simultanées à **3 requêtes concurrentes** par défaut (configurable via `MAX_CONCURRENT_DOWNLOADS` dans `token.env`) via un sémaphore global.
+- **Flux non-bloquant** : Les téléchargements lourds s'effectuent dans des threads séparés via le pool de threads interne de FastAPI (`asyncio.to_thread`), garantissant que le serveur reste 100% disponible pour répondre à d'autres requêtes (recherches, métadonnées, etc.) pendant les transferts.
+- **Téléchargement d'albums et playlists** : Pour éviter d'inonder Deezer de requêtes parallèles lors de la récupération d'un album ou d'une playlist, un sémaphore interne limite à **3 pistes téléchargées simultanément** par requête.
+
+### 🧠 Système de Cache (TTL Cache)
+Pour minimiser les requêtes réseau vers les serveurs de Deezer / YouTube et accélérer la navigation dans l'application mobile, l'API intègre un système de cache temporaire en mémoire :
+- **Métadonnées** : Les réponses pour les métadonnées de morceaux, albums et playlists sont mises en cache pendant **10 minutes**.
+- **Images de couverture (Artwork)** : Les fichiers images binaires des pochettes d'albums et de morceaux bénéficient du cache des métadonnées sous-jacentes.
+- **Résultats de recherche** : Les requêtes de recherche unifiée sont mises en cache pendant **5 minutes** (évitant les appels répétés à `yt-dlp` pour les mêmes termes).
 
 ### 🧹 Nettoyage automatique
-- **En cours d'exécution** : Les fichiers temporaires sont effacés du disque via les `BackgroundTasks` de FastAPI dès que le transfert réseau avec le client est complété.
-- **Au démarrage** : Le dossier temporaire `tmp/` est vidé au boot du serveur API.
+- **En cours d'exécution** : Les fichiers temporaires (fichiers audio individuels ou archives ZIP d'albums/playlists) sont supprimés du disque via les `BackgroundTasks` de FastAPI dès que le transfert réseau HTTP avec le client mobile est finalisé.
+- **Au démarrage & Cycle de vie** : Le dossier temporaire `tmp/` est vidé lors de la phase de démarrage gérée par le gestionnaire de cycle de vie moderne `lifespan` de FastAPI.
