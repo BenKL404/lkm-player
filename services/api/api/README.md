@@ -106,6 +106,14 @@ Si l'en-tête est manquant ou incorrect, l'API renverra une réponse `403 Forbid
 | GET | `/api/v1/youtube/{video_id}/download` | Télécharge le flux audio d'une vidéo YouTube (MP3) |
 | GET | `/api/v1/soundcloud/download?url=...` | Télécharge un titre SoundCloud par URL (MP3) |
 
+### 📻 Streaming (Lecture en Direct)
+
+| Méthode | Route | Description |
+|--------|--------|-------------|
+| GET | `/api/v1/deezer/track/{id}/stream?format=MP3_128\|MP3_320\|FLAC` | Diffuse en direct le flux audio décrypté en mémoire sans écriture disque |
+| GET | `/api/v1/youtube/{video_id}/stream` | Diffuse en direct le flux audio d'une vidéo YouTube via `yt-dlp` |
+| GET | `/api/v1/soundcloud/stream?url=...` | Diffuse en direct le flux audio d'un morceau SoundCloud via `yt-dlp` |
+
 > 📌 `{id}` peut être l’ID seul (ex: `823267272` pour Deezer ou `dQw4w9WgXcQ` pour YouTube) ou l’URL complète.
 
 ---
