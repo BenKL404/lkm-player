@@ -177,10 +177,24 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    # L'auth se fait via clé API (header/query), pas via cookies : pas besoin
+    # de credentials, et la combinaison allow_origins=["*"] + credentials=True
+    # est de toute façon rejetée par les navigateurs.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get(
+    "/health",
+    summary="Vérification de l'état du service",
+    description="Endpoint léger, sans authentification, destiné aux healthchecks Docker / reverse proxy.",
+    tags=["Service"],
+)
+async def health():
+    return {"status": "ok"}
+
 
 # Routeur versionné (V1) avec authentification optionnelle
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(verify_api_key)])

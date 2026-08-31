@@ -68,3 +68,24 @@ key.properties
 **/local_resources/
 tmp/
 services/api/bin/
+
+# ===== Notes / scripts de déploiement perso (VPS) =====
+# Rien de spécifique à l'infra serveur (IP, domaine, topologie du reverse
+# proxy, scripts de déploiement) ne doit être versionné sur GitHub.
+/ARCHITECTURE.md
+/NGINX_DEPLOY.md
+/scripts/certbot.js
+/scripts/deploy.js
+/scripts/deploy_backend.js
+/scripts/deploy_api.sh
+/scripts/fix_nginx.js
+/scripts/package_deploy.js
+/scripts/package_deploy_backend.js
+/scripts/test-announcement.js
+/scripts/test-telemetry.js
+/scripts/test_ssh.js
+/deploy_tmp/
+/deploy.tar.gz
+/deploy/
+/docker-compose.prod.yml
+/docs/DEPLOY_VPS.md

@@ -2,7 +2,7 @@ FROM python:3.13-alpine3.21
 
 RUN apk add --no-cache ffmpeg nodejs alpine-sdk python3-dev py3-setuptools tiff-dev jpeg-dev openjpeg-dev zlib-dev freetype-dev lcms2-dev \
     libwebp-dev tcl-dev tk-dev harfbuzz-dev fribidi-dev libimagequant-dev \
-    libxcb-dev libpng-dev
+    libxcb-dev libpng-dev curl
 
 WORKDIR /usr/src/app
 
@@ -27,6 +27,15 @@ RUN if [ "$ENABLE_FLAC" = "0" ]; then \
       echo "FLAC : enabled"; \
     fi
 
+# Exécution en utilisateur non-root (sécurité en prod)
+RUN addgroup -S app && adduser -S app -G app \
+    && mkdir -p /usr/src/app/tmp \
+    && chown -R app:app /usr/src/app
+USER app
+
 EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:8000/health || exit 1
 
 CMD ["python", "-m", "uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "8000"]
