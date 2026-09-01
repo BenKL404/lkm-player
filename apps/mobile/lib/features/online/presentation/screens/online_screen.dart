@@ -626,7 +626,8 @@ class _AlbumTrackSheetRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
-        color: scheme.surfaceContainerLow,
+        // Ligne plate, sans carte colorée — cohérent avec la liste principale.
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: isDownloading ? null : onDownload,
@@ -686,13 +687,11 @@ class _AlbumTrackSheetRow extends StatelessWidget {
                   ),
                 ),
                 if (!isDownloading)
-                  IconButton.filledTonal(
+                  IconButton(
+                    tooltip: 'Télécharger',
                     onPressed: onDownload,
-                    icon: const Icon(Icons.download_rounded, size: 20),
-                    style: IconButton.styleFrom(
-                      backgroundColor:
-                          scheme.primaryContainer.withValues(alpha: 0.65),
-                    ),
+                    icon: Icon(Icons.download_rounded,
+                        color: scheme.onSurfaceVariant, size: 22),
                   )
                 else
                   SizedBox(
@@ -934,14 +933,8 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: scheme.primaryContainer.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 20, color: scheme.onPrimaryContainer),
-          ),
+          // Icône seule, sans pastille colorée derrière.
+          Icon(icon, size: 22, color: scheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -997,59 +990,41 @@ class _AlbumCard extends StatelessWidget {
     final p = progress?.clamp(0.0, 1.0);
 
     return SizedBox(
-      width: artSize + 8,
+      width: artSize,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Material(
-            color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(22),
+            // Plate, sans carte colorée derrière : la pochette seule, comme
+            // partout ailleurs dans l'app (AlbumCard, SongCard, ArtistCard…).
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
             clipBehavior: Clip.antiAlias,
-            elevation: 0,
             child: InkWell(
               onTap: isDownloading ? null : onOpenDetails,
               child: SizedBox(
-                width: artSize + 8,
-                height: artSize + 8,
+                width: artSize,
+                height: artSize,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Positioned.fill(
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child:
-                              album.imgUrl != null && album.imgUrl!.isNotEmpty
-                                  ? Image.network(
-                                      album.imgUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) =>
-                                          _AlbumPlaceholder(scheme: scheme),
-                                    )
-                                  : _AlbumPlaceholder(scheme: scheme),
-                        ),
-                      ),
-                    ),
+                    album.imgUrl != null && album.imgUrl!.isNotEmpty
+                        ? Image.network(
+                            album.imgUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                _AlbumPlaceholder(scheme: scheme),
+                          )
+                        : _AlbumPlaceholder(scheme: scheme),
                     if (isDownloading)
-                      Positioned.fill(
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
-                            child: ColoredBox(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              child: Center(
-                                child: Text(
-                                  p != null && p > 0
-                                      ? '${(p * 100).round()}%'
-                                      : '…',
-                                  style: textTheme.titleMedium?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
+                      ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        child: Center(
+                          child: Text(
+                            p != null && p > 0 ? '${(p * 100).round()}%' : '…',
+                            style: textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
@@ -1064,22 +1039,17 @@ class _AlbumCard extends StatelessWidget {
                       ),
                     if (!isDownloading)
                       Positioned(
-                        right: 10,
-                        bottom: 10,
-                        child: Material(
-                          color: scheme.primary,
-                          shape: const CircleBorder(),
-                          elevation: 3,
-                          shadowColor: Colors.black38,
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: onOpenDetails,
-                            child: const Padding(
-                              padding: EdgeInsets.all(10),
-                              child: Icon(Icons.queue_music_rounded,
-                                  color: Colors.white, size: 20),
-                            ),
+                        right: 8,
+                        bottom: 8,
+                        child: FilledButton(
+                          onPressed: onOpenDetails,
+                          style: FilledButton.styleFrom(
+                            shape: const CircleBorder(),
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(40, 40),
                           ),
+                          child:
+                              const Icon(Icons.queue_music_rounded, size: 20),
                         ),
                       ),
                   ],
@@ -1130,6 +1100,21 @@ class _AlbumPlaceholder extends StatelessWidget {
 
 // ——— Morceau ———
 
+/// Libellé court par source, réutilisé par la carte de résultat et la
+/// feuille de détail d'un morceau.
+String sourceBadgeLabel(ResultSource source) => switch (source) {
+      ResultSource.deezer => 'DZ',
+      ResultSource.youtube => 'YT',
+      ResultSource.soundcloud => 'SC',
+    };
+
+/// Couleur associée à chaque source, idem.
+Color sourceBadgeColor(ResultSource source) => switch (source) {
+      ResultSource.deezer => const Color(0xFFB266FF),
+      ResultSource.youtube => const Color(0xFFFF5A5A),
+      ResultSource.soundcloud => const Color(0xFFFF9142),
+    };
+
 class _TrackCard extends ConsumerWidget {
   const _TrackCard({
     required this.track,
@@ -1145,17 +1130,9 @@ class _TrackCard extends ConsumerWidget {
   final VoidCallback onDownload;
   final VoidCallback onStream;
 
-  String get _badgeLabel => switch (track.source) {
-        ResultSource.deezer => 'DZ',
-        ResultSource.youtube => 'YT',
-        ResultSource.soundcloud => 'SC',
-      };
+  String get _badgeLabel => sourceBadgeLabel(track.source);
 
-  Color get _badgeColor => switch (track.source) {
-        ResultSource.deezer => const Color(0xFFB266FF),
-        ResultSource.youtube => const Color(0xFFFF5A5A),
-        ResultSource.soundcloud => const Color(0xFFFF9142),
-      };
+  Color get _badgeColor => sourceBadgeColor(track.source);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1169,9 +1146,12 @@ class _TrackCard extends ConsumerWidget {
     final isPlayingThis = isActive && playerState.isPlaying;
 
     return Material(
+      // Ligne plate sur le fond de la page par défaut (comme les autres
+      // listes de l'app) ; seule la piste en cours de lecture ressort avec
+      // une légère teinte, pas de carte colorée systématique.
       color: isActive
           ? scheme.primaryContainer.withValues(alpha: 0.08)
-          : scheme.surfaceContainerLow,
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
