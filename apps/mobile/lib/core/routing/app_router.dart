@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:musio/features/album/presentation/screens/album_details_screen.dart';
 import 'package:musio/features/artist/presentation/screens/artist_details_screen.dart';
 import 'package:musio/features/download/presentation/screens/downloads_screen.dart';
-import 'package:musio/features/home/presentation/screens/home_screen.dart';
+import 'package:musio/features/home/presentation/screens/main_screen.dart';
 import 'package:musio/features/home/presentation/screens/splash_screen.dart';
 import 'package:musio/features/music/data/models/song_model.dart';
 import 'package:musio/features/online/presentation/screens/online_screen.dart';
@@ -44,13 +44,13 @@ class AppRouter {
         builder: (context, state) => const SplashScreen(),
       ),
 
-      // Home (Offline)
+      // Coquille principale (Accueil / Découvrir / Bibliothèque / Réglages)
       GoRoute(
         path: home,
         name: 'home',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
-          child: const OfflineHomeScreen(),
+          child: const MainScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },

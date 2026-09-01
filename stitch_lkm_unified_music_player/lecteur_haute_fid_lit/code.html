@@ -1,0 +1,177 @@
+<!DOCTYPE html><html class="dark" lang="fr"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>LKM Player - Now Playing</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#201f1f",
+                        "on-tertiary-container": "#564a00",
+                        "surface-bright": "#3a3939",
+                        "on-primary": "#003734",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#313030",
+                        "secondary-container": "#901822",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#410006",
+                        "outline-variant": "#3d4948",
+                        "error": "#ffb4ab",
+                        "on-primary-container": "#00544f",
+                        "on-secondary": "#68000f",
+                        "on-surface-variant": "#bcc9c7",
+                        "error-container": "#93000a",
+                        "secondary": "#ffb3b0",
+                        "on-primary-fixed-variant": "#00504c",
+                        "primary-fixed": "#7cf6ec",
+                        "surface-dim": "#131313",
+                        "on-background": "#e5e2e1",
+                        "on-tertiary-fixed": "#211b00",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-secondary-container": "#ff9e9b",
+                        "surface-tint": "#5dd9d0",
+                        "primary-container": "#4ecdc4",
+                        "surface-container-highest": "#353534",
+                        "tertiary-fixed-dim": "#dec651",
+                        "secondary-fixed": "#ffdad8",
+                        "background": "#131313",
+                        "surface": "#131313",
+                        "on-tertiary": "#393000",
+                        "surface-variant": "#353534",
+                        "tertiary": "#eed65f",
+                        "primary-fixed-dim": "#5dd9d0",
+                        "on-tertiary-fixed-variant": "#524600",
+                        "secondary-fixed-dim": "#ffb3b0",
+                        "inverse-primary": "#006a65",
+                        "outline": "#869391",
+                        "on-primary-fixed": "#00201e",
+                        "tertiary-fixed": "#fbe36a",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container-low": "#1c1b1b",
+                        "primary": "#6ee9e0",
+                        "tertiary-container": "#d1ba46",
+                        "on-secondary-fixed-variant": "#8c1520",
+                        "surface-container-high": "#2a2a2a",
+                        "on-error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px",
+                        "26px": "26px"
+                    },
+                    "spacing": {
+                        "album-art-size": "calc(100vw - 40px)",
+                        "stack-gap-sm": "8px",
+                        "stack-gap-lg": "24px",
+                        "container-padding": "20px",
+                        "stack-gap-md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "title-sm": ["Lexend"],
+                        "body-md": ["Lexend"],
+                        "display-lg": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "400" }],
+                        "title-sm": ["18px", { "lineHeight": "24px", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #131313; color: #e5e2e1; }
+        .glass-panel {
+            background: rgba(42, 42, 42, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .album-art-shadow {
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        .progress-bar-fill {
+            background: linear-gradient(90deg, #4ecdc4, #5dd9d0);
+            box-shadow: 0 0 10px rgba(78, 205, 196, 0.5);
+        }
+        .bg-gradient-dynamic {
+            background: radial-gradient(circle at 50% 30%, rgba(78, 205, 196, 0.15) 0%, rgba(19, 19, 19, 1) 70%);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-body-md bg-gradient-dynamic">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-container-padding h-16 w-full z-40 bg-transparent text-on-surface">
+<button class="material-symbols-outlined text-on-surface hover:opacity-80 transition-opacity duration-200 active:scale-95 text-3xl">expand_more</button>
+<div class="flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Now Playing</span>
+<span class="font-title-sm text-title-sm text-primary">LKM Player</span>
+</div>
+<button class="material-symbols-outlined text-on-surface hover:opacity-80 transition-opacity duration-200 active:scale-95 text-2xl">more_vert</button>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col px-container-padding pb-6 relative z-10 justify-between max-w-md mx-auto w-full pb-20">
+<!-- Album Art Container -->
+<div class="flex-1 flex flex-col justify-center items-center py-4 w-full">
+<div class="relative w-full aspect-square max-w-[340px] rounded-[26px] overflow-hidden album-art-shadow group">
+<img alt="Album Art" class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105" data-alt="A highly detailed, ultra-high-resolution album cover artwork featuring a sleek, minimalist geometric design. The composition centers on intersecting luminous teal and silver shapes against a deep, true-black background. The lighting is dramatic and moody, emphasizing the high-fidelity, sophisticated aesthetic of a premium electronic or progressive rock album. Fine textures reminiscent of brushed metal and polished glass add depth to the digital art." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnlHw_OoMe-WIJ2m-q-25KJUlo8Rc_XPvJBsnY_i-MK2e-QTf7v9M9wZ0dK4Ha_bjf-DMKm28t5nbLzHTyTuk5j8S4EU9I1VGhxqlbrxjhZsPS7eE26wDXgMoGDXvTpUeuE3rMHxxv9KqO6PxUBUtf0N5fl5m1XIsXRFu2lIYHKmwPvHAjp_R6ZhVDAUSATK46j5vu7BoYBcAXV4Rc7RUyJCQleYgbbQFPh3BY63J9PKbbIJ4GAN_XJQ">
+<!-- Live Lyrics Overlay (Hidden by default, shown via JS toggle if needed, or static here) -->
+<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6 pointer-events-none">
+<p class="font-body-md text-body-md text-on-surface-variant mb-2">And the rhythm takes control...</p>
+<p class="font-title-sm text-title-sm text-primary font-medium">Losing yourself in the sound tonight</p>
+</div>
+</div>
+</div>
+<!-- Track Info & Primary Actions -->
+<div class="flex justify-between items-end mb-6 w-full max-w-[340px] mx-auto">
+<div class="flex flex-col">
+<h1 class="font-headline-md text-headline-md text-on-surface mb-1 truncate pr-4">Midnight Resonance</h1>
+<p class="font-body-md text-body-md text-on-surface-variant truncate">Audiophile Pro • Sonic Landscapes</p>
+</div>
+<button class="material-symbols-outlined text-primary hover:opacity-80 transition-all duration-200 text-3xl">favorite</button>
+</div>
+<!-- Playback Controls Section -->
+<div class="w-full max-w-[340px] mx-auto flex flex-col gap-stack-lg">
+<!-- Progress Bar -->
+<div class="w-full flex flex-col gap-2">
+<div class="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden relative cursor-pointer group">
+<div class="absolute top-0 left-0 h-full w-[45%] progress-bar-fill rounded-full"></div>
+<!-- Playhead -->
+<div class="absolute top-1/2 left-[45%] -translate-y-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"></div>
+</div>
+<div class="flex justify-between items-center w-full">
+<span class="font-label-sm text-label-sm text-on-surface-variant">2:14</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">-3:42</span>
+</div>
+</div>
+<!-- Primary Controls -->
+<div class="flex justify-between items-center w-full px-2">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors duration-200 text-2xl">shuffle</button>
+<button class="material-symbols-outlined text-on-surface hover:text-primary transition-colors duration-200 text-4xl">skip_previous</button>
+<!-- Play FAB -->
+<button class="w-20 h-20 bg-primary-container text-[#003734] rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(78,205,196,0.3)] hover:scale-105 active:scale-95 transition-all duration-300">
+<span class="material-symbols-outlined text-5xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="material-symbols-outlined text-on-surface hover:text-primary transition-colors duration-200 text-4xl">skip_next</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors duration-200 text-2xl">repeat</button>
+</div>
+<!-- Secondary Actions Row -->
+<nav class="fixed bottom-0 left-0 right-0 bg-surface-container-high border-t border-outline-variant flex justify-around items-center h-16 z-50 px-4"><button class="flex flex-col items-center gap-1 text-primary"><span class="material-symbols-outlined">home</span><span class="text-[10px] font-label-sm">Home</span></button><button class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">search</span><span class="text-[10px] font-label-sm">Search</span></button><button class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">library_music</span><span class="text-[10px] font-label-sm">Library</span></button><button class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">settings</span><span class="text-[10px] font-label-sm">Settings</span></button></nav>
+</div>
+</main>
+
+
+</body></html>

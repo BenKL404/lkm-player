@@ -222,20 +222,30 @@ class MusioAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   MediaItem _createMediaItem(SongModel song) {
+    final art = song.albumArtPath;
+    final artUri = art == null
+        ? null
+        : (art.startsWith('http://') || art.startsWith('https://')
+            ? Uri.parse(art)
+            : Uri.file(art));
     return MediaItem(
       id: song.id,
       album: song.album,
       title: song.title,
       artist: song.artist,
       duration: Duration(milliseconds: song.duration),
-      artUri: song.albumArtPath != null ? Uri.file(song.albumArtPath!) : null,
+      artUri: artUri,
       extras: {'path': song.path},
     );
   }
 
   AudioSource _createAudioSource(SongModel song) {
+    // Piste en streaming (recherche en ligne, pas encore téléchargée) : URL
+    // réseau plutôt que chemin de fichier local.
+    final isNetworkStream =
+        song.path.startsWith('http://') || song.path.startsWith('https://');
     return AudioSource.uri(
-      Uri.file(song.path),
+      isNetworkStream ? Uri.parse(song.path) : Uri.file(song.path),
       tag: song,
     );
   }

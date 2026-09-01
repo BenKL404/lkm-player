@@ -1,0 +1,262 @@
+<!DOCTYPE html><html class="dark" lang="fr"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>LKM Player - Library</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container": "#201f1f",
+                        "on-tertiary-container": "#564a00",
+                        "surface-bright": "#3a3939",
+                        "on-primary": "#003734",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#313030",
+                        "secondary-container": "#901822",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#410006",
+                        "outline-variant": "#3d4948",
+                        "error": "#ffb4ab",
+                        "on-primary-container": "#00544f",
+                        "on-secondary": "#68000f",
+                        "on-surface-variant": "#bcc9c7",
+                        "error-container": "#93000a",
+                        "secondary": "#ffb3b0",
+                        "on-primary-fixed-variant": "#00504c",
+                        "primary-fixed": "#7cf6ec",
+                        "surface-dim": "#131313",
+                        "on-background": "#e5e2e1",
+                        "on-tertiary-fixed": "#211b00",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-secondary-container": "#ff9e9b",
+                        "surface-tint": "#5dd9d0",
+                        "primary-container": "#4ecdc4",
+                        "surface-container-highest": "#353534",
+                        "tertiary-fixed-dim": "#dec651",
+                        "secondary-fixed": "#ffdad8",
+                        "background": "#131313",
+                        "surface": "#131313",
+                        "on-tertiary": "#393000",
+                        "surface-variant": "#353534",
+                        "tertiary": "#eed65f",
+                        "primary-fixed-dim": "#5dd9d0",
+                        "on-tertiary-fixed-variant": "#524600",
+                        "secondary-fixed-dim": "#ffb3b0",
+                        "inverse-primary": "#006a65",
+                        "outline": "#869391",
+                        "on-primary-fixed": "#00201e",
+                        "tertiary-fixed": "#fbe36a",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container-low": "#1c1b1b",
+                        "primary": "#6ee9e0",
+                        "tertiary-container": "#d1ba46",
+                        "on-secondary-fixed-variant": "#8c1520",
+                        "surface-container-high": "#2a2a2a",
+                        "on-error-container": "#ffdad6"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "album-art-size": "calc(100vw - 40px)",
+                        "stack-gap-sm": "8px",
+                        "stack-gap-lg": "24px",
+                        "container-padding": "20px",
+                        "stack-gap-md": "16px"
+                    },
+                    fontFamily: {
+                        "headline-md": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "title-sm": ["Lexend"],
+                        "body-md": ["Lexend"],
+                        "display-lg": ["Lexend"]
+                    },
+                    fontSize: {
+                        "headline-md": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "label-sm": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "400" }],
+                        "title-sm": ["18px", { lineHeight: "24px", fontWeight: "500" }],
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "display-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); color: theme('colors.on-background'); }
+        .glass-card {
+            background: rgba(42, 42, 42, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .mini-player-glass {
+            background: rgba(28, 27, 27, 0.85);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .active-glow {
+            box-shadow: 0 0 15px 0 rgba(78, 205, 196, 0.15);
+        }
+    </style>
+</head>
+<body class="antialiased pb-32 h-screen overflow-hidden flex flex-col bg-surface-container-lowest">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-container-padding h-16 w-full z-40 docked full-width top-0 sticky">
+<button class="p-2 -ml-2 rounded-full hover:opacity-80 transition-opacity duration-200 active:scale-95 text-primary dark:text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary tracking-tight">LKM Player</h1>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant hover:opacity-80 transition-opacity duration-200 active:scale-95">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A macro shot of a sleek, dark metallic audio receiver knob reflecting a subtle teal light in a moody, high-end studio setting. The image is crisp, modern, and embodies sophisticated audio precision." src="https://lh3.googleusercontent.com/aida-public/AB6AXuByEfS7qvBfShizsp8cY0gvZc9r386Da3tFY01viRQSyoJiEnKdVAgUXd0f1qDLfB8Mxd2ge2YnKMkC8sjUcHkRNKV6JaDK_YCAgJfRhz7vtvmPILv5JVKAHVAkuVm9FeZHbSoJH5LIm_yaC--dQa5A03W4v8ZjDEZdRrJR7veMAQ2QsAX2SptSEdkHcm-j9HafwKUTt8LQ9oeVRvghzlOamKgPs20j8SWg3lxOR6dqrKd2rxLya-EjNg">
+</div>
+</header>
+<main class="px-container-padding pt-stack-gap-md space-y-stack-gap-lg flex-1 overflow-y-auto">
+<!-- Library Filters -->
+<section>
+<div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+<button class="px-4 py-2 rounded-full bg-primary-container text-on-primary-container font-label-sm text-label-sm whitespace-nowrap">Playlists</button>
+<button class="px-4 py-2 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm whitespace-nowrap border border-outline-variant">Artistes</button>
+<button class="px-4 py-2 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm whitespace-nowrap border border-outline-variant">Albums</button>
+<button class="px-4 py-2 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm whitespace-nowrap border border-outline-variant">Dossiers</button>
+</div>
+</section>
+<!-- Favorites Grid -->
+<section>
+<h2 class="font-title-sm text-title-sm mb-stack-gap-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container" style="font-variation-settings: 'FILL' 1;">favorite</span>
+                Favoris Locaux
+            </h2>
+<div class="grid grid-cols-2 gap-4">
+<!-- Fav Card 1 -->
+<div class="rounded-2xl p-3 flex flex-col gap-3 group relative overflow-hidden active-glow">
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-primary-container opacity-10 rounded-full blur-xl group-hover:opacity-20 transition-opacity"></div>
+<div class="w-full aspect-square rounded-xl overflow-hidden relative">
+<img class="w-full h-full object-cover" data-alt="A moody, high-contrast abstract rendering of soundwaves using deep blacks, charcoal greys, and striking teal accents, resembling a modern minimalist album cover for electronic music." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzQCJd_siopmyEf7hHd728VIr_u9ItrsD12Y8oPoskqgzEwGq0zm2P01ncr-PVWz3Z9uanOOkzT3ZMxbuWt9Gd1eto8eBSTQOQWl_pNnHdejltoZrzvU456WJOq_b2axseSBzMI5hIOWAzcGDyVnCMCCxcAsiLtDhtot8RsqBfy9EYzg01Ol0yUD9Ji1wFlxSrXGppXKXvk0fyR1bDbkr_yt-ViGZ8Z9USxbHvOuhLCvqMMO-Ob6nvUw">
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-white text-3xl" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+</div>
+<div>
+<p class="font-body-md text-body-md truncate font-medium">Nocturne</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Synthwave Collection</p>
+</div>
+</div>
+<!-- Fav Card 2 -->
+<div class="rounded-2xl p-3 flex flex-col gap-3 group relative overflow-hidden">
+<div class="w-full aspect-square rounded-xl overflow-hidden relative">
+<img class="w-full h-full object-cover" data-alt="A sophisticated, dark-themed macro photograph of a vinyl record's grooves catching a sharp teal light reflection, conveying a sense of premium analog audio quality in a modern setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7NtUORuvs8lwCpqyoDKzrJEU9PXFcgj07lXQPZRWtFs7K2Ek_IaK6pHJQEutrf0Ie631lwtxjTkPpyilRkutpIOD8KjYfSlDDqfKEXDLmjEK9LnOCelXbnLp_UpPjX9ZotSFowY7i5A3lcjN6pIdx2zN0eLwCU3cDTjDCtId3mZEjsaC9nbtd71Hcmg5DLvwY7iq_UtcPTUIwY_NGjVRVqh-cswHLuBLwAfIXcwuJpMV_DzDVcVNbhQ">
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-white text-3xl" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+</div>
+<div>
+<p class="font-body-md text-body-md truncate font-medium">Jazz Essentials</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">FLAC • 24bit</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Additions List -->
+<section class="pb-8">
+<div class="flex justify-between items-end mb-stack-gap-md">
+<h2 class="font-title-sm text-title-sm">Ajouts Récents</h2>
+<button class="font-label-sm text-label-sm text-primary-container hover:text-primary transition-colors">Voir tout</button>
+</div>
+<div class="space-y-2">
+<!-- Track 1 -->
+<div class="flex items-center gap-4 p-2 rounded-xl hover:bg-surface-container-high transition-colors group cursor-pointer">
+<div class="w-12 h-12 rounded-lg overflow-hidden relative flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Dark, moody minimalist digital art featuring geometric shapes in deep charcoal and subtle teal, perfect for a modern electronic album cover thumbnail." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD0aoR7nzMEDIhiQbryFxZgmIpZcNR0kl2oJsBL-prGLvttAn0Nv7sp8eVh3Lj0Q47-YmdM18ybaR1ElnlwsVt0aH8gK3cU3EuKh71v-gIlH4BbCDfEkkjOzChAKfOPFOjUjAJ5xngyWlL-2IFlheqBpUUcdSlzc41mLnFvTXG2NJoIvJaJ3gwoZ38USu6Tse5Gy1yIRZrZ5eAd6iXSDlAuFc3w78vNMnaFffrR8g4nU0A4hFAauqLuWQ">
+<div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<p class="font-body-md text-body-md truncate text-primary-container font-medium">Cybernetic Resonance</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Local Device • 320kbps</p>
+</div>
+<button class="text-on-surface-variant hover:text-primary-container p-2">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<!-- Track 2 -->
+<div class="flex items-center gap-4 p-2 rounded-xl hover:bg-surface-container-high transition-colors group cursor-pointer">
+<div class="w-12 h-12 rounded-lg overflow-hidden relative flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="A sleek, dark monochrome photograph of acoustic soundproofing foam panels with a hint of teal backlighting, conveying professional studio quality audio environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGeImdt-YSNc4gGFc8_G9t4T1M_SPduDnoIP_eRYIitWjy8B_9mP5Evsq5YPeiANT5lovM90ZiVRr6Y4CSzqREsZi1OEeMiCcaiuzgKziCo13B9jbuUoYqDyv-svq4oN8t1kq0flRnGoT_Ok6PcpNGO3kUe-Ku9m-N2iBD4OVZa-lrlxKXZBev3fCSw_bZP3-7GtgEOE2sAvlYhjIM34H6c6jw4uQMiKEuO-to6ndqcCdXMORsEUJVYQ">
+<div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<p class="font-body-md text-body-md truncate">Acoustic Sessions Vol. 2</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">SD Card • FLAC</p>
+</div>
+<button class="text-on-surface-variant hover:text-primary-container p-2">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Mini Player (Sits above BottomNavBar) -->
+<div class="fixed bottom-[88px] left-0 w-full px-2 z-40">
+<div class="mini-player-glass rounded-2xl p-2 pr-4 flex items-center gap-3 shadow-2xl mx-2 cursor-pointer hover:bg-surface-container-high/90 transition-colors">
+<div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 animate-[pulse_4s_ease-in-out_infinite]">
+<img class="w-full h-full object-cover" data-alt="Abstract deep space nebulas in pure black and vibrant teal, representing a high-energy electronic track currently playing in a premium dark mode music app." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7jy-KFLhEJ6GtbS2_Qkc6OHpguHVCspYX48w0W6EB6YvouIL3sZ4CZuXhPYPdfjNNSZpUnSPrLG6rkhKSldUX4V9UBRQBal3tzpFuajPapzgEYICwoVR4P60uMttXTG2-YbqhLKcTUxYTm8h-_TOhsut7tZd8UKOEYTyvjc3rI5YwKVTIBnhTl17kgf7k6zUH4q7eZ8duh5uRnJ743iD537-hSSunPowpP9vx-XExen5S5ogWU0HNVw">
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-[14px]">graphic_eq</span>
+<p class="font-body-md text-body-md truncate font-medium">Cybernetic Resonance</p>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Unknown Artist</p>
+</div>
+<div class="flex items-center gap-3 flex-shrink-0">
+<button class="text-on-surface hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="text-on-surface hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">skip_next</span>
+</button>
+</div>
+</div>
+<!-- Progress Bar Indicator -->
+<div class="absolute bottom-0 left-6 right-6 h-[2px] bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary-container w-1/3 rounded-full"></div>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 shadow-lg docked full-width rounded-t-xl bg-gradient-to-t from-black to-transparent">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all duration-300 ease-in-out active:scale-90 w-16" href="#">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all duration-300 ease-in-out active:scale-90 w-16" href="#">
+<span class="material-symbols-outlined mb-1">search</span>
+<span class="font-label-sm text-label-sm">Search</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 transition-all duration-300 ease-in-out active:scale-90 w-auto min-w-[64px]" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">library_music</span>
+<span class="font-label-sm text-label-sm font-medium">Library</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all duration-300 ease-in-out active:scale-90 w-16" href="#">
+<span class="material-symbols-outlined mb-1">settings</span>
+<span class="font-label-sm text-label-sm">Settings</span>
+</a></nav>
+
+
+
+
+</body></html>

@@ -26,6 +26,46 @@ class AppTheme {
   static const Color accentColor = Color(0xFF6C63FF);
   static const Color aColor = Color(0xFF3C454B);
 
+  /// Palette "Sonic Noir" — identité visuelle fixe de LKM Player en mode
+  /// sombre avec l'accent teal par défaut (valeurs exactes des maquettes,
+  /// pas générées via Material You). Les autres accents / le thème clair
+  /// restent générés depuis la couleur choisie (voir [_theme]).
+  static const ColorScheme _sonicNoirDark = ColorScheme(
+    brightness: Brightness.dark,
+    surface: Color(0xFF131313),
+    onSurface: Color(0xFFE5E2E1),
+    surfaceDim: Color(0xFF131313),
+    surfaceBright: Color(0xFF3A3939),
+    surfaceContainerLowest: Color(0xFF0E0E0E),
+    surfaceContainerLow: Color(0xFF1C1B1B),
+    surfaceContainer: Color(0xFF201F1F),
+    surfaceContainerHigh: Color(0xFF2A2A2A),
+    surfaceContainerHighest: Color(0xFF353534),
+    onSurfaceVariant: Color(0xFFBCC9C7),
+    outline: Color(0xFF869391),
+    outlineVariant: Color(0xFF3D4948),
+    inverseSurface: Color(0xFFE5E2E1),
+    onInverseSurface: Color(0xFF313030),
+    surfaceTint: Color(0xFF5DD9D0),
+    primary: Color(0xFF6EE9E0),
+    onPrimary: Color(0xFF003734),
+    primaryContainer: Color(0xFF4ECDC4),
+    onPrimaryContainer: Color(0xFF00544F),
+    inversePrimary: Color(0xFF006A65),
+    secondary: Color(0xFFFFB3B0),
+    onSecondary: Color(0xFF68000F),
+    secondaryContainer: Color(0xFF901822),
+    onSecondaryContainer: Color(0xFFFF9E9B),
+    tertiary: Color(0xFFEED65F),
+    onTertiary: Color(0xFF393000),
+    tertiaryContainer: Color(0xFFD1BA46),
+    onTertiaryContainer: Color(0xFF564A00),
+    error: Color(0xFFFFB4AB),
+    onError: Color(0xFF690005),
+    errorContainer: Color(0xFF93000A),
+    onErrorContainer: Color(0xFFFFDAD6),
+  );
+
   static ThemeData lightTheme = _theme(brightness: Brightness.light);
   static ThemeData darkTheme = _theme(brightness: Brightness.dark);
 
@@ -37,10 +77,10 @@ class AppTheme {
   static ThemeData _theme(
       {required Brightness brightness, Color? seedColor}) {
     final seed = seedColor ?? accentColors[0];
-    final scheme = ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: brightness,
-    );
+    final isSonicNoir = brightness == Brightness.dark && seed == accentColors[0];
+    final scheme = isSonicNoir
+        ? _sonicNoirDark
+        : ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
 
     final isDark = brightness == Brightness.dark;
 
@@ -52,24 +92,35 @@ class AppTheme {
       fontFamily: 'Lexend',
     );
 
+    // Échelle typographique "Sonic Noir" : display-lg / headline-md /
+    // title-sm / body-md / label-sm, mappées sur les rôles Material les
+    // plus proches pour que tout le reste de l'app (qui lit déjà
+    // Theme.of(context).textTheme.xxx) en hérite automatiquement.
     final textTheme = base.textTheme.copyWith(
       headlineLarge: base.textTheme.headlineLarge?.copyWith(
+        fontSize: 32,
+        height: 40 / 32,
         fontWeight: FontWeight.w700,
-        letterSpacing: -0.3,
+        letterSpacing: -0.64, // display-lg
       ),
       headlineMedium: base.textTheme.headlineMedium?.copyWith(
         fontWeight: FontWeight.w700,
         letterSpacing: -0.2,
       ),
       titleLarge: base.textTheme.titleLarge?.copyWith(
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.2,
+        fontSize: 24,
+        height: 32 / 24,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.24, // headline-md
       ),
       titleMedium: base.textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w600,
+        fontSize: 18,
+        height: 24 / 18,
+        fontWeight: FontWeight.w500, // title-sm
       ),
       bodyLarge: base.textTheme.bodyLarge?.copyWith(
-        height: 1.15,
+        fontSize: 16,
+        height: 1.5, // body-md
       ),
       bodyMedium: base.textTheme.bodyMedium?.copyWith(
         height: 1.2,
@@ -77,6 +128,11 @@ class AppTheme {
       labelLarge: base.textTheme.labelLarge?.copyWith(
         fontWeight: FontWeight.w700,
         letterSpacing: 0.2,
+      ),
+      labelSmall: base.textTheme.labelSmall?.copyWith(
+        fontSize: 12,
+        height: 16 / 12,
+        letterSpacing: 0.6, // label-sm
       ),
     );
 

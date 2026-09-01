@@ -639,7 +639,7 @@ class _LyricsProviderElement extends AutoDisposeFutureProviderElement<String?>
   String get songId => (origin as LyricsProvider).songId;
 }
 
-String _$musicHash() => r'3abf695809afa2dd744523da46ac31c07bab9429';
+String _$musicHash() => r'4d6a8d7fb07d41c8b5a2921ec39b0e85025ec46b';
 
 /// See also [Music].
 @ProviderFor(Music)

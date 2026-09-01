@@ -1,0 +1,320 @@
+<!DOCTYPE html><html class="dark" lang="fr"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>LKM Player - Accueil</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Google Fonts: Lexend -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#201f1f",
+                        "on-tertiary-container": "#564a00",
+                        "surface-bright": "#3a3939",
+                        "on-primary": "#003734",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#313030",
+                        "secondary-container": "#901822",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#410006",
+                        "outline-variant": "#3d4948",
+                        "error": "#ffb4ab",
+                        "on-primary-container": "#00544f",
+                        "on-secondary": "#68000f",
+                        "on-surface-variant": "#bcc9c7",
+                        "error-container": "#93000a",
+                        "secondary": "#ffb3b0",
+                        "on-primary-fixed-variant": "#00504c",
+                        "primary-fixed": "#7cf6ec",
+                        "surface-dim": "#131313",
+                        "on-background": "#e5e2e1",
+                        "on-tertiary-fixed": "#211b00",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-secondary-container": "#ff9e9b",
+                        "surface-tint": "#5dd9d0",
+                        "primary-container": "#4ecdc4",
+                        "surface-container-highest": "#353534",
+                        "tertiary-fixed-dim": "#dec651",
+                        "secondary-fixed": "#ffdad8",
+                        "background": "#131313",
+                        "surface": "#131313",
+                        "on-tertiary": "#393000",
+                        "surface-variant": "#353534",
+                        "tertiary": "#eed65f",
+                        "primary-fixed-dim": "#5dd9d0",
+                        "on-tertiary-fixed-variant": "#524600",
+                        "secondary-fixed-dim": "#ffb3b0",
+                        "inverse-primary": "#006a65",
+                        "outline": "#869391",
+                        "on-primary-fixed": "#00201e",
+                        "tertiary-fixed": "#fbe36a",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container-low": "#1c1b1b",
+                        "primary": "#6ee9e0",
+                        "tertiary-container": "#d1ba46",
+                        "on-secondary-fixed-variant": "#8c1520",
+                        "surface-container-high": "#2a2a2a",
+                        "on-error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "album-art-size": "calc(100vw - 40px)",
+                        "stack-gap-sm": "8px",
+                        "stack-gap-lg": "24px",
+                        "container-padding": "20px",
+                        "stack-gap-md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "title-sm": ["Lexend"],
+                        "body-md": ["Lexend"],
+                        "display-lg": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "400" }],
+                        "title-sm": ["18px", { "lineHeight": "24px", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Base styles & utilities */
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Hidden scrollbar for horizontal scrolling lists */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Glassmorphism effects */
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Active glow for selected elements */
+        .active-glow {
+            box-shadow: 0 0 15px 0 rgba(78, 205, 196, 0.15);
+        }
+        
+        /* Inner border for album art */
+        .album-border {
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col font-body-md overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container h-screen overflow-hidden bg-surface-container-lowest">
+<!-- TopAppBar JSON Component -->
+<header class="flex justify-between items-center px-container-padding h-16 w-full z-40 dark:bg-surface text-primary dark:text-primary font-headline-md text-headline-md docked full-width top-0 sticky bg-transparent">
+<button aria-label="Menu" class="hover:opacity-80 transition-opacity duration-200 active:scale-95 flex items-center justify-center p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-container">
+<span class="material-symbols-outlined text-on-surface dark:text-on-surface text-2xl" style="font-variation-settings: 'FILL' 0;">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary flex-1 text-center tracking-tight truncate px-4">
+            LKM Player
+        </h1>
+<button aria-label="User profile avatar" class="hover:opacity-80 transition-opacity duration-200 active:scale-95 relative w-8 h-8 rounded-full overflow-hidden border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container">
+<img alt="Profile" class="w-full h-full object-cover" data-alt="A highly detailed close-up portrait of a sophisticated user in a dimly lit, high-end listening room. The lighting is moody with subtle teal and warm amber highlights reflecting off modern audio equipment in the background. The visual style is premium, cinematic, and sharply focused, matching the True Black minimalist aesthetic of the UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYQcFAKQyRMN9Do1WTw-LPR_L3-1zVdfrZFg1DKiGLQ6jhfvIXsXPPnaVjXFi8G-Z6VntHeuTxNuiY6r5NbgOwYGAjmq6R6xXTiOhNXSeEB57QTgqkrtNLwVOuNyckJq0Rhg0fgwSxhC6xeJeCInNYhanKbJKR8KYn09LQuhSz93qwEAcDYg_GpGWT_QtTIinbiQ42-gi2CAWAkxWDZx1DZFKbuBXpzNaOEKEsgKtR7ZO-Y6cCwAXG3g">
+</button>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 px-container-padding pb-32 space-y-stack-gap-lg overflow-y-auto min-h-0">
+<!-- Hero / Greeting Section -->
+<section class="mt-4 animate-fade-in-up" style="animation: fadeInUp 0.6s ease-out forwards;">
+<h2 class="font-display-lg text-display-lg text-on-surface mb-2">Bonjour,</h2>
+<p class="font-title-sm text-title-sm text-on-surface-variant opacity-80">Prêt pour une session d'écoute ?</p>
+</section>
+<!-- Sources / Shortcuts (Bento Grid Style) -->
+<section class="grid grid-cols-2 gap-stack-gap-md">
+<!-- Streaming Source: Deezer -->
+<button class="rounded-xl p-4 flex flex-col justify-between aspect-video relative overflow-hidden group hover:bg-surface-bright transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-primary-container active:scale-[0.98] border">
+<div class="absolute inset-0 bg-gradient-to-br from-[#FF0092]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+<div class="flex justify-between items-start w-full relative z-10">
+<span class="material-symbols-outlined text-on-surface text-3xl" style="font-variation-settings: 'FILL' 1;">headphones</span>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform group-hover:translate-x-1 group-hover:-translate-y-1">arrow_outward</span>
+</div>
+<div class="text-left w-full relative z-10">
+<h3 class="font-title-sm text-title-sm text-on-surface font-semibold">Deezer</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-1">Connecté</p>
+</div>
+</button>
+<!-- Streaming Source: SoundCloud -->
+<button class="rounded-xl p-4 flex flex-col justify-between aspect-video relative overflow-hidden group hover:bg-surface-bright transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-primary-container active:scale-[0.98] border">
+<div class="absolute inset-0 bg-gradient-to-br from-[#FF5500]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+<div class="flex justify-between items-start w-full relative z-10">
+<span class="material-symbols-outlined text-on-surface text-3xl" style="font-variation-settings: 'FILL' 1;">cloud</span>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform group-hover:translate-x-1 group-hover:-translate-y-1">arrow_outward</span>
+</div>
+<div class="text-left w-full relative z-10">
+<h3 class="font-title-sm text-title-sm text-on-surface font-semibold">SoundCloud</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-1">Découvrir</p>
+</div>
+</button>
+</section>
+<!-- Recently Played (Horizontal Scroll) -->
+<section>
+<div class="flex justify-between items-end mb-4">
+<h2 class="font-headline-md text-headline-md text-on-surface">Écoutés récemment</h2>
+</div>
+<div class="flex overflow-x-auto hide-scrollbar snap-x snap-mandatory -mx-container-padding px-container-padding space-x-4 pb-4">
+<!-- Track Card 1 (Active/Playing) -->
+<div class="snap-start shrink-0 w-[140px] flex flex-col group cursor-pointer relative">
+<div class="relative w-full aspect-square rounded-lg overflow-hidden album-border mb-3 active-glow">
+<img alt="Album Art" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A striking abstract digital art piece serving as an album cover. It features deep, mesmerizing true black voids interspersed with sharp, luminous teal geometric shards that suggest rhythm and technical precision. The aesthetic is sophisticated, modern minimalism, perfectly suited for a high-end electronic music track." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXRJhwknzae-sNODmq5mzOYa-3cTSfy-bknFoh4WPqRuQxiYZmYDagf9Us4jc_Tqn5gLXysRtjd7Mmv6HSjSmUbG5KB11DbeqUVV_hR5y39kP0Z3KT8oSx2_fYsIdJzl67uRYzFRqCAgJewleZpf5Z5fSCY4rM02Q_hE9h_GNkuk7f7aAJ0UvDmpl8GwV7UgIoBb7MT-s2AMnvFN2U8lPuV_ayz0gjOZPw1D248yOv9TCeynbHtaKiNQ">
+<!-- Playing overlay -->
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 transition-opacity duration-300">
+<div class="w-8 h-8 rounded-full bg-primary-container/20 flex items-center justify-center backdrop-blur-sm">
+<div class="flex space-x-1 items-end h-3">
+<div class="w-[3px] bg-primary-container rounded-t-sm h-full animate-[bounce_1s_infinite_ease-in-out]"></div>
+<div class="w-[3px] bg-primary-container rounded-t-sm h-2/3 animate-[bounce_1s_infinite_ease-in-out_0.2s]"></div>
+<div class="w-[3px] bg-primary-container rounded-t-sm h-4/5 animate-[bounce_1s_infinite_ease-in-out_0.4s]"></div>
+</div>
+</div>
+</div>
+</div>
+<h3 class="font-title-sm text-title-sm text-primary-container truncate w-full">Neon Pulse</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate w-full mt-1">Cybernetic</p>
+</div>
+<!-- Track Card 2 -->
+<div class="snap-start shrink-0 w-[140px] flex flex-col group cursor-pointer">
+<div class="relative w-full aspect-square rounded-lg overflow-hidden album-border mb-3">
+<img alt="Album Art" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A moody, high-contrast photograph of a sleek, vintage microphone standing alone on a dark stage illuminated by a single, soft overhead spotlight. The background is completely black, creating a profound sense of depth and focus. The visual style is premium, textured, and deeply atmospheric, embodying a sophisticated audio experience." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRxzv1apPK7sR4XoDXswoczlYRbjrGEZc0b803WE6CdSIB7naRe0cCp6dCohjUq7RUiPyNakTD1udBpxDgXASv08qCpei647huMwqg-6z1TRAZ2lxkJnLrV7gXp3K9tPcBFwrNJEtWapyWxvPqBB-S-WIPY-c2czhK4VOPTMFDN4HGpLSCiKbtjs7HtfF5XbETry_EmQ9yNL41fUl-Vr0abcD-ZtfLh9I07cnbNbIFx5E1Kq9UzN3lqA">
+<div class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+<button class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform duration-300 focus:outline-none">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<h3 class="font-title-sm text-title-sm text-on-surface truncate w-full">Midnight Jazz</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate w-full mt-1">Miles Coltrane</p>
+</div>
+<!-- Track Card 3 -->
+<div class="snap-start shrink-0 w-[140px] flex flex-col group cursor-pointer">
+<div class="relative w-full aspect-square rounded-lg overflow-hidden album-border mb-3">
+<img alt="Album Art" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A minimalist architectural visualization of a brutalist concrete structure set against a stark, starry night sky. The lighting highlights the rough texture of the concrete, contrasting with smooth, glowing amber LED accents integrated into the structure. The mood is calm, executive, and highly polished, reflecting a sophisticated digital environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDzsGCMplpsVKirgoHowGbv0TTnMhTlvH_utaRctF-7xigb939bktDoFNzC0k2awcHg5CbLQtGxsEShWEN53UcKp5IOqOeEkqDCQEhL6DU92GB2p-agVsrCqYDHanAuFmxTeWSTwcguu8WKTkOeO1rhntoYlpMwAo-xjhKvmjgmpyNkspyyjGZQoRyEik3_v8zJ7-zLXA5bnEnh_iWlh1G8-1wJI66_ifB8oDiPaDD8Z6FBy1Hl9Mse9w">
+<div class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+<button class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform duration-300 focus:outline-none">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<h3 class="font-title-sm text-title-sm text-on-surface truncate w-full">Concrete Echoes</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate w-full mt-1">Structure</p>
+</div>
+</div>
+</section>
+<!-- Trending (List View) -->
+<section>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-4">Tendances streaming</h2>
+<div class="flex flex-col space-y-4">
+<!-- List Item 1 -->
+<div class="flex items-center space-x-4 p-2 rounded-lg hover:bg-surface-container-high transition-colors duration-200 cursor-pointer group">
+<div class="relative w-14 h-14 rounded-md overflow-hidden album-border shrink-0">
+<img alt="Trending Track" class="w-full h-full object-cover" data-alt="A macro photograph of water droplets on a dark, matte surface reflecting vibrant neon cyan and magenta lights. The focus is razor-sharp on a single droplet, blurring the rest into a smooth bokeh. The overall aesthetic is dark, fluid, and highly modern, suggesting high-fidelity electronic soundscapes." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB27j2Z7Ssk1tEv35i542M3i0VgM4Wg5OU248OCjv0Rla9L3yr7CN7JgJ--qRArvLdUMEljSZ41d82g4Kx5xc2rXp5_2SjGu3R58k_uOn-b2hOb9amPMdVGos-rUpENCEhyBLK-ggBGAVPvjnzCOzi8rXK3I3oy3zmq6d0M33dxHvukfvGgcHqjxQmDwjFyuXxQF3S5BBQK8gUBtfH4kvS72Qa2IEh36NorjscMT-N5CaZJig9X1P3EIQ">
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+<span class="material-symbols-outlined text-white text-lg" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-title-sm text-title-sm text-on-surface truncate">Liquid State</h3>
+<div class="flex items-center space-x-2 mt-1">
+<span class="material-symbols-outlined text-primary-container text-[14px]" style="font-variation-settings: 'FILL' 1;">headphones</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Flux Pavilion</p>
+</div>
+</div>
+<button aria-label="More options" class="text-on-surface-variant hover:text-primary-container p-2 focus:outline-none">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<!-- List Item 2 -->
+<div class="flex items-center space-x-4 p-2 rounded-lg hover:bg-surface-container-high transition-colors duration-200 cursor-pointer group">
+<div class="relative w-14 h-14 rounded-md overflow-hidden album-border shrink-0">
+<img alt="Trending Track" class="w-full h-full object-cover" data-alt="A dense, dark forest viewed from above at twilight. A single, perfectly straight highway cuts through the trees, illuminated only by the light trails of passing cars, creating long streaks of bright white and deep red. The visual tone is cinematic, immersive, and sleek, aligning with the premium dark-mode interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBB3pRpSkFEIKRIC9mUUdVgpXxGziHSVJoOGe-gFo0LN8rpE-Nzp6-mtk9eD_vnWtQgYUJyKa4WeU_HGJaFajNfOzXutBAg5Ets_l0JviCbAMbUmcVwSzwif-c0_pdfOMOAdZj7c2IB9HiU_EqW40LPQSuBBi_FXqPefGokmSL92u_0wCRIggaj1z2zipeBTW2toe0GjLCWRaamJC5ZASU7irtOvbBfeb5mCCK24b-3cGrs4KA4plGZ5w">
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+<span class="material-symbols-outlined text-white text-lg" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-title-sm text-title-sm text-on-surface truncate">Night Drive</h3>
+<div class="flex items-center space-x-2 mt-1">
+<span class="material-symbols-outlined text-primary-container text-[14px]" style="font-variation-settings: 'FILL' 1;">headphones</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Synthwave Collective</p>
+</div>
+</div>
+<button aria-label="More options" class="text-on-surface-variant hover:text-primary-container p-2 focus:outline-none">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Action Button (FAB) - Play Context -->
+<!-- Positioned above the BottomNav/Playback bar -->
+<button aria-label="Resume playing" class="fixed bottom-28 right-container-padding w-14 h-14 bg-primary-container rounded-full shadow-[0_4px_20px_rgba(78,205,196,0.3)] flex items-center justify-center z-40 hover:scale-105 active:scale-95 transition-transform duration-200 focus:outline-none focus:ring-4 focus:ring-primary-container/30">
+<span class="material-symbols-outlined text-on-primary-container text-3xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<!-- BottomNavBar JSON Component -->
+<nav aria-label="Main Navigation" class="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 dark:bg-surface-container text-primary dark:text-primary font-label-sm text-label-sm docked full-width rounded-t-xl bg-gradient-to-t from-black to-transparent shadow-lg">
+<!-- Active Tab: Home (Accueil) -->
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 hover:text-primary transition-all duration-300 ease-in-out active:scale-90 focus:outline-none">
+<span class="material-symbols-outlined text-2xl mb-1" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-sm">Home</span>
+</button>
+<!-- Inactive Tab: Search -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all duration-300 ease-in-out active:scale-90 focus:outline-none px-4 py-1 rounded-full hover:bg-surface-variant/50">
+<span class="material-symbols-outlined text-2xl mb-1" style="font-variation-settings: 'FILL' 0;">search</span>
+<span class="font-label-sm">Search</span>
+</button>
+<!-- Inactive Tab: Library -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all duration-300 ease-in-out active:scale-90 focus:outline-none px-4 py-1 rounded-full hover:bg-surface-variant/50">
+<span class="material-symbols-outlined text-2xl mb-1" style="font-variation-settings: 'FILL' 0;">library_music</span>
+<span class="font-label-sm">Library</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all duration-300 ease-in-out active:scale-90 focus:outline-none px-4 py-1 rounded-full hover:bg-surface-variant/50"><span class="material-symbols-outlined text-2xl mb-1" style="font-variation-settings: 'FILL' 0;">settings</span><span class="font-label-sm">Settings</span></button></nav>
+<!-- CSS Animations -->
+<style>
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+
+
+
+
+</body></html>

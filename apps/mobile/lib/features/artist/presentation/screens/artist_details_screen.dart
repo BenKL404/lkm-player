@@ -43,7 +43,12 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
         // Here we ideally want to load the image from file, but artist image logic in MusicService
         // uses album art path of its first song.
         // The UI uses AlbumArtImageLarge to resolve this.
-        final imageProvider = FileImage(File(artist.imagePath!));
+        // Redimensionnée : évite de décoder la pochette en pleine résolution
+        // juste pour en extraire une couleur, ce qui saccadait la transition.
+        final path = artist.imagePath!;
+        final ImageProvider imageProvider = path.startsWith('content://')
+            ? ResizeImage(NetworkImage(path), width: 80, height: 80)
+            : ResizeImage(FileImage(File(path)), width: 80, height: 80);
         final palette = await PaletteGenerator.fromImageProvider(
           imageProvider,
           maximumColorCount: 10,
@@ -89,6 +94,8 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
             Theme.of(context).scaffoldBackgroundColor, dominantColor!, 0.15)
         : Theme.of(context).scaffoldBackgroundColor;
 
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       backgroundColor: backgroundColor,
       body: CustomScrollView(
@@ -98,15 +105,14 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
             expandedHeight: 300,
             pinned: true,
             backgroundColor: backgroundColor,
-            iconTheme: const IconThemeData(color: Colors.white),
+            iconTheme: IconThemeData(color: scheme.onSurface),
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 artist.name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                    ),
               ),
               background: Stack(
                 fit: StackFit.expand,
@@ -151,7 +157,7 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
           // Divider
           SliverToBoxAdapter(
             child: Divider(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: scheme.outlineVariant.withValues(alpha: 0.4),
               thickness: 1,
             ),
           ),
@@ -168,17 +174,12 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton.icon(
+                    child: FilledButton.icon(
                       onPressed: () {
                         ref.read(audioPlayerProvider.notifier).play(songs, 0);
                       },
-                      icon: const Icon(Icons.play_arrow),
+                      icon: const Icon(Icons.play_arrow_rounded),
                       label: const Text('Lire tout'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -188,12 +189,11 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
                         ref.read(audioPlayerProvider.notifier).play(songs, 0);
                         ref.read(audioPlayerProvider.notifier).toggleShuffle();
                       },
-                      icon: const Icon(Icons.shuffle),
+                      icon: const Icon(Icons.shuffle_rounded),
                       label: const Text('Mélanger'),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: const BorderSide(color: Colors.white24),
-                        foregroundColor: Colors.white,
+                        foregroundColor: scheme.onSurface,
+                        side: BorderSide(color: scheme.outlineVariant),
                       ),
                     ),
                   ),
@@ -206,13 +206,7 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(
-                'Top chansons',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-              ),
+              child: Text('Top chansons', style: Theme.of(context).textTheme.titleLarge),
             ),
           ),
 
@@ -220,21 +214,11 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final song = songs[index];
-                return Theme(
-                  data: Theme.of(context).copyWith(
-                    // Ensure text contrasts well with potentially dark background
-                    textTheme: Theme.of(context).textTheme.apply(
-                          bodyColor: Colors.white,
-                          displayColor: Colors.white,
-                        ),
-                    iconTheme: const IconThemeData(color: Colors.white),
-                  ),
-                  child: SongTile(
-                    song: song,
-                    playlist: songs,
-                    songIndex: index,
-                    showIndex: true, // Afficher le numéro de piste
-                  ),
+                return SongTile(
+                  song: song,
+                  playlist: songs,
+                  songIndex: index,
+                  showIndex: true, // Afficher le numéro de piste
                 );
               },
               childCount: songs.length,
@@ -242,45 +226,29 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
           ),
 
           // Albums
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Albums',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+          if (artistAlbums.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('Albums', style: Theme.of(context).textTheme.titleLarge),
               ),
             ),
-          ),
-
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.75,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final album = artistAlbums[index];
-                  // Temporarily ignore text coloring for album card inside
-                  return Theme(
-                      data: Theme.of(context).copyWith(
-                        textTheme: Theme.of(context).textTheme.apply(
-                              bodyColor: Colors.white,
-                              displayColor: Colors.white,
-                            ),
-                      ),
-                      child: AlbumCard(album: album));
-                },
-                childCount: artistAlbums.length,
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.75,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => AlbumCard(album: artistAlbums[index]),
+                  childCount: artistAlbums.length,
+                ),
               ),
             ),
-          ),
+          ],
 
           // Espace pour le mini player
           const SliverToBoxAdapter(
@@ -288,7 +256,7 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
           ),
         ],
       ),
-      bottomSheet: const MiniPlayer(),
+      bottomNavigationBar: const MiniPlayer(),
     );
   }
 
@@ -299,17 +267,15 @@ class _ArtistDetailsScreenState extends ConsumerState<ArtistDetailsScreen> {
           value,
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color:
-                    Theme.of(context).colorScheme.primary, // Apple music pink
+                color: Theme.of(context).colorScheme.primaryContainer,
               ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: Colors.white70),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
         ),
       ],
     );
@@ -335,20 +301,14 @@ class _WikipediaSection extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'À propos',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-              ),
+              Text('À propos', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
                 info.extract,
                 maxLines: 6,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white70,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       height: 1.4,
                     ),
               ),

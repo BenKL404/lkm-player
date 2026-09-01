@@ -1,0 +1,234 @@
+<!DOCTYPE html><html class="dark" lang="fr"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>LKM Player - Recherche</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container": "#201f1f",
+                        "on-tertiary-container": "#564a00",
+                        "surface-bright": "#3a3939",
+                        "on-primary": "#003734",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#313030",
+                        "secondary-container": "#901822",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#410006",
+                        "outline-variant": "#3d4948",
+                        "error": "#ffb4ab",
+                        "on-primary-container": "#00544f",
+                        "on-secondary": "#68000f",
+                        "on-surface-variant": "#bcc9c7",
+                        "error-container": "#93000a",
+                        "secondary": "#ffb3b0",
+                        "on-primary-fixed-variant": "#00504c",
+                        "primary-fixed": "#7cf6ec",
+                        "surface-dim": "#131313",
+                        "on-background": "#e5e2e1",
+                        "on-tertiary-fixed": "#211b00",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-secondary-container": "#ff9e9b",
+                        "surface-tint": "#5dd9d0",
+                        "primary-container": "#4ecdc4",
+                        "surface-container-highest": "#353534",
+                        "tertiary-fixed-dim": "#dec651",
+                        "secondary-fixed": "#ffdad8",
+                        "background": "#131313",
+                        "surface": "#131313",
+                        "on-tertiary": "#393000",
+                        "surface-variant": "#353534",
+                        "tertiary": "#eed65f",
+                        "primary-fixed-dim": "#5dd9d0",
+                        "on-tertiary-fixed-variant": "#524600",
+                        "secondary-fixed-dim": "#ffb3b0",
+                        "inverse-primary": "#006a65",
+                        "outline": "#869391",
+                        "on-primary-fixed": "#00201e",
+                        "tertiary-fixed": "#fbe36a",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container-low": "#1c1b1b",
+                        "primary": "#6ee9e0",
+                        "tertiary-container": "#d1ba46",
+                        "on-secondary-fixed-variant": "#8c1520",
+                        "surface-container-high": "#2a2a2a",
+                        "on-error-container": "#ffdad6"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "album-art-size": "calc(100vw - 40px)",
+                        "stack-gap-sm": "8px",
+                        "stack-gap-lg": "24px",
+                        "container-padding": "20px",
+                        "stack-gap-md": "16px"
+                    },
+                    fontFamily: {
+                        "headline-md": ["Lexend", "sans-serif"],
+                        "label-sm": ["Lexend", "sans-serif"],
+                        "title-sm": ["Lexend", "sans-serif"],
+                        "body-md": ["Lexend", "sans-serif"],
+                        "display-lg": ["Lexend", "sans-serif"]
+                    },
+                    fontSize: {
+                        "headline-md": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "label-sm": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "400" }],
+                        "title-sm": ["18px", { lineHeight: "24px", fontWeight: "500" }],
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "display-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }]
+                    }
+                }
+            }
+        };
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        body { background-color: #131313; color: #e5e2e1; overflow-x: hidden; }
+        .glass-panel {
+            background: rgba(42, 42, 42, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .track-active {
+            background: rgba(78, 205, 196, 0.05);
+            box-shadow: 0 0 15px rgba(78, 205, 196, 0.1);
+        }
+        .bottom-gradient {
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 40%, transparent 100%);
+        }
+    </style>
+</head>
+<body class="antialiased h-screen flex flex-col overflow-hidden">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-container-padding h-16 w-full z-40 bg-surface dark:bg-surface sticky top-0">
+<button aria-label="Menu" class="text-primary dark:text-primary hover:opacity-80 transition-opacity duration-200 active:scale-95">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary">LKM Player</h1>
+<button aria-label="User Profile" class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant hover:opacity-80 transition-opacity duration-200 active:scale-95">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A macro shot of a sleek, dark metallic audio equipment surface, featuring a glowing cyan LED indicator ring. The mood is highly technical and premium, emphasizing sophisticated audiophile gear aesthetics." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmmdP8frBxcoJP1v49OSNKmKa9s9H7cSgw_sGvL8kbSTUDpa8FuTmnZTWeSLND3rLx2UEI2G07GvnMhKNQUuzqGk2SVsjgZV7dsBUrR884GeyW3VBrQHC555TzjxxvvumdJkYaE40FsoFPaYY6rBMeac5Vrdhv697ABg_1fZOc_cWg3nQSGgc_s5N_UEdYu8OZiC3VW3IzRAkPl0SCGE4SnMGQJbgoe3R-T5aiA_LbwsTi_4qWvym1Jg">
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 px-container-padding pt-4 space-y-stack-gap-lg overflow-y-auto pb-24">
+<!-- Search Bar -->
+<section class="w-full">
+<div class="relative glass-panel rounded-full h-12 flex items-center px-4">
+<span class="material-symbols-outlined text-on-surface-variant mr-3" data-icon="search">search</span>
+<input class="bg-transparent border-none outline-none text-on-surface w-full font-body-md text-body-md placeholder:text-on-surface-variant focus:ring-0 p-0" placeholder="Rechercher titres, artistes, albums..." type="text" value="Interstellar">
+<button class="text-on-surface-variant hover:text-primary transition-colors ml-2">
+<span class="material-symbols-outlined" data-icon="tune">tune</span>
+</button>
+</div>
+</section>
+<!-- Filters / Chips -->
+<section class="flex overflow-x-auto gap-3 pb-2 scrollbar-hide -mx-container-padding px-container-padding">
+<button class="bg-primary-container text-on-primary-container font-label-sm text-label-sm rounded-full px-4 py-2 whitespace-nowrap active:scale-95 transition-transform">Tous les résultats</button>
+<button class="bg-surface-variant text-on-surface font-label-sm text-label-sm rounded-full px-4 py-2 whitespace-nowrap active:scale-95 transition-transform opacity-80 hover:opacity-100 border border-transparent hover:border-outline-variant">Fichiers Locaux</button>
+<button class="bg-surface-variant text-on-surface font-label-sm text-label-sm rounded-full px-4 py-2 whitespace-nowrap active:scale-95 transition-transform opacity-80 hover:opacity-100 border border-transparent hover:border-outline-variant">Streaming</button>
+<button class="bg-surface-variant text-on-surface font-label-sm text-label-sm rounded-full px-4 py-2 whitespace-nowrap active:scale-95 transition-transform opacity-80 hover:opacity-100 border border-transparent hover:border-outline-variant">Artistes</button>
+</section>
+<!-- Results List -->
+<section class="space-y-4">
+<h2 class="font-title-sm text-title-sm text-on-surface">Résultats pour "Interstellar"</h2>
+<div class="space-y-2">
+<!-- Track 1: Active, Streaming (SoundCloud) -->
+<div class="flex items-center gap-4 p-3 rounded-lg track-active transition-all group">
+<div class="w-12 h-12 rounded-md overflow-hidden relative shrink-0 border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="A moody, high-contrast abstract rendering of deep space, featuring faint nebulas in teal and dark blue, evoking an interstellar sci-fi audio landscape." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBaVU_zx3rTYxqbjDths4MwFTlMWMQLSToxIsCp5TCr8R0b-Eiknk1bqYVdIz3Tkx8nwgUedClG-SiLyupOtJBkMXLw8lkLH_ZZqzqD0KDXCxKNhrUTxHSHbg5k_usE7p1fWitCzLq3Ez_8jk2CcqBRknZLqC8uy5S8yPO2T94RqHBfSXqYdeun1h_J5KTqiBFR3qVRqrHL-Byw9VUGYbtfDfuuo3oGuqrpkVeZo80QXOBEIywDAvV2TA">
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="equalizer" style="font-variation-settings: 'FILL' 1;">equalizer</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-body-md text-body-md text-primary truncate font-medium">Cornfield Chase (Remix)</h3>
+<span class="bg-[#ff5500]/20 text-[#ff5500] text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0">SC</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Hans Zimmer • Electronic</p>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full active:scale-90">
+<span class="material-symbols-outlined" data-icon="download">download</span>
+</button>
+<button class="text-primary hover:opacity-80 transition-colors p-2 rounded-full active:scale-90">
+<span class="material-symbols-outlined" data-icon="pause_circle" style="font-variation-settings: 'FILL' 1;">pause_circle</span>
+</button>
+</div>
+</div>
+<!-- Track 2: Local File -->
+<div class="flex items-center gap-4 p-3 rounded-lg hover:bg-surface-container-high transition-all group border border-transparent hover:border-outline-variant/10">
+<div class="w-12 h-12 rounded-md overflow-hidden relative shrink-0 bg-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="music_note">music_note</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-body-md text-body-md text-on-surface truncate">Interstellar Main Theme</h3>
+<span class="bg-primary/20 text-primary text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0">LOCAL</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Hans Zimmer • FLAC • 44.1kHz</p>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full active:scale-90">
+<span class="material-symbols-outlined" data-icon="download_done">download_done</span>
+</button>
+<button class="text-on-surface hover:text-primary transition-colors p-2 rounded-full active:scale-90">
+<span class="material-symbols-outlined" data-icon="play_circle" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</button>
+</div>
+</div>
+<!-- Track 3: Streaming (YouTube) -->
+<div class="flex items-center gap-4 p-3 rounded-lg hover:bg-surface-container-high transition-all group border border-transparent hover:border-outline-variant/10">
+<div class="w-12 h-12 rounded-md overflow-hidden relative shrink-0 border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="A cinematic concert hall stage bathed in dark shadows with a single bright white spotlight shining down on a grand piano. High contrast, minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5prCZiaHa2uqyOO-ZBcQOR38NIFy1eEfTvtsZiLE177PVuvB_B3oU1mhf38tyyiIJxFzSfbpOrywJtaTl6iN9lovUjkufAGUcuOZz84amNGvYiCLH2PK6c3G5JhSWp74GozARVD-qF95TxR7lJdhWPKpR7npr2BclO5CBrbNZ2gA2J8okfN3-e_FBW9WgkNk0zkOuTfKHU-pUXrA7WNcR3FcHDqeY4mJ8caDB7HmGhJJRh8VNSf9U2A">
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-body-md text-body-md text-on-surface truncate">S.T.A.Y. (Live in Prague)</h3>
+<span class="bg-[#ff0000]/20 text-[#ff0000] text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0">YT</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Hans Zimmer Live • Orchestral</p>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full active:scale-90">
+<span class="material-symbols-outlined" data-icon="download">download</span>
+</button>
+<button class="text-on-surface hover:text-primary transition-colors p-2 rounded-full active:scale-90">
+<span class="material-symbols-outlined" data-icon="play_circle" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 bg-surface-container dark:bg-surface-container rounded-t-xl shadow-lg">
+<!-- Decoration Gradient -->
+<div class="absolute -top-16 left-0 right-0 h-16 bottom-gradient pointer-events-none -z-10"></div>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all duration-300 ease-in-out active:scale-90 group">
+<span class="material-symbols-outlined mb-1 group-hover:scale-110 transition-transform" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</button>
+<!-- Active Tab: Search -->
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1.5 transition-all duration-300 ease-in-out active:scale-90 shadow-sm">
+<span class="material-symbols-outlined mb-0.5" data-icon="search" style="font-variation-settings: 'FILL' 1;">search</span>
+<span class="font-label-sm text-label-sm font-medium">Search</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all duration-300 ease-in-out active:scale-90 group">
+<span class="material-symbols-outlined mb-1 group-hover:scale-110 transition-transform" data-icon="library_music">library_music</span>
+<span class="font-label-sm text-label-sm">Library</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all duration-300 ease-in-out active:scale-90 group"><span class="material-symbols-outlined mb-1 group-hover:scale-110 transition-transform">settings</span><span class="font-label-sm text-label-sm">Settings</span></button></nav>
+
+
+</body></html>

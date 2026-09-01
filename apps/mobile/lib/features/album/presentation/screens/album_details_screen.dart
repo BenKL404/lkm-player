@@ -175,13 +175,14 @@ class _AlbumDetailsScreenState extends ConsumerState<AlbumDetailsScreen> {
     }
     final album = albums[albumIndex];
 
+    final scheme = Theme.of(context).colorScheme;
     final backgroundColor = dominantColor != null
         ? Color.lerp(
             Theme.of(context).scaffoldBackgroundColor, dominantColor!, 0.35)!
         : Theme.of(context).scaffoldBackgroundColor;
     final playButtonColor = dominantColor != null
-        ? _vibrantButtonColor(dominantColor!, Theme.of(context).colorScheme)
-        : Theme.of(context).colorScheme.primary;
+        ? _vibrantButtonColor(dominantColor!, scheme)
+        : scheme.primaryContainer;
 
     // First song for art display in popup
     final firstSong = songs.isNotEmpty ? songs.first : null;
@@ -251,31 +252,18 @@ class _AlbumDetailsScreenState extends ConsumerState<AlbumDetailsScreen> {
                                 .headlineSmall
                                 ?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: scheme.onSurface,
                                 ),
                           ),
                         ),
                         const SizedBox(height: 4),
-                        // Artiste — affichage simple
                         if (album.artist.isNotEmpty)
                           Text(
                             album.artist,
                             style: Theme.of(context)
                                 .textTheme
                                 .titleMedium
-                                ?.copyWith(
-                                  color: Colors.white70,
-                                ),
-                          )
-                        else
-                          Text(
-                            album.artist,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  color: Colors.white70,
-                                ),
+                                ?.copyWith(color: scheme.onSurfaceVariant),
                           ),
                       ],
                     ),
@@ -300,14 +288,14 @@ class _AlbumDetailsScreenState extends ConsumerState<AlbumDetailsScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
-                              ?.copyWith(color: Colors.white60),
+                              ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                       Text(
                         '${album.trackCount} titre${album.trackCount > 1 ? 's' : ''}',
                         style: Theme.of(context)
                             .textTheme
                             .bodyMedium
-                            ?.copyWith(color: Colors.white60),
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -316,7 +304,7 @@ class _AlbumDetailsScreenState extends ConsumerState<AlbumDetailsScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Expanded(
-                        child: ElevatedButton(
+                        child: FilledButton.icon(
                           onPressed: () {
                             if (songs.isNotEmpty) {
                               ref
@@ -324,30 +312,17 @@ class _AlbumDetailsScreenState extends ConsumerState<AlbumDetailsScreen> {
                                   .play(songs, 0);
                             }
                           },
-                          style: ElevatedButton.styleFrom(
+                          style: FilledButton.styleFrom(
                             backgroundColor: playButtonColor,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            elevation: 0,
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.play_arrow_rounded),
-                              SizedBox(width: 8),
-                              Text('Lecture',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold)),
-                            ],
-                          ),
+                          icon: const Icon(Icons.play_arrow_rounded),
+                          label: const Text('Lecture'),
                         ),
                       ),
                       const SizedBox(width: 16),
-                      ElevatedButton(
+                      FilledButton.tonal(
                         onPressed: () {
                           if (songs.isNotEmpty) {
                             ref
@@ -358,20 +333,13 @@ class _AlbumDetailsScreenState extends ConsumerState<AlbumDetailsScreen> {
                                 .toggleShuffle();
                           }
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.15),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          elevation: 0,
-                          shadowColor: Colors.transparent,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: scheme.surfaceContainerHigh,
+                          foregroundColor: scheme.onSurface,
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 16),
                         ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [Icon(Icons.shuffle_rounded)],
-                        ),
+                        child: const Icon(Icons.shuffle_rounded),
                       ),
                     ],
                   ),
@@ -385,20 +353,11 @@ class _AlbumDetailsScreenState extends ConsumerState<AlbumDetailsScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final song = songs[index];
-                return Theme(
-                  data: Theme.of(context).copyWith(
-                    textTheme: Theme.of(context).textTheme.apply(
-                          bodyColor: Colors.white,
-                          displayColor: Colors.white,
-                        ),
-                    iconTheme: const IconThemeData(color: Colors.white),
-                  ),
-                  child: SongTile(
-                    song: song,
-                    playlist: songs,
-                    songIndex: index,
-                    showIndex: true,
-                  ),
+                return SongTile(
+                  song: song,
+                  playlist: songs,
+                  songIndex: index,
+                  showIndex: true,
                 );
               },
               childCount: songs.length,
@@ -432,7 +391,7 @@ class _AlbumDetailsScreenState extends ConsumerState<AlbumDetailsScreen> {
           ),
         ],
       ),
-      bottomSheet: const MiniPlayer(),
+      bottomNavigationBar: const MiniPlayer(),
     );
   }
 }
@@ -470,11 +429,10 @@ class _WikiDescriptionText extends ConsumerWidget {
               info.extract,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                height: 1.4,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
             ),
             const SizedBox(height: 6),
             GestureDetector(
@@ -519,6 +477,7 @@ class _ArtistPopup extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncInfo = ref.watch(artistWikipediaInfoProvider(artistName));
     final screenHeight = MediaQuery.of(context).size.height;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -532,7 +491,7 @@ class _ArtistPopup extends ConsumerWidget {
               margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 60),
               constraints: BoxConstraints(maxHeight: screenHeight * 0.82),
               decoration: BoxDecoration(
-                color: const Color(0xFF0A0A0A),
+                color: scheme.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: ClipRRect(
@@ -549,15 +508,15 @@ class _ArtistPopup extends ConsumerWidget {
                         children: [
                           _buildArtImage(),
                           // Gradient bottom
-                          const DecoratedBox(
+                          DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
-                                stops: [0.5, 1.0],
+                                stops: const [0.5, 1.0],
                                 colors: [
                                   Colors.transparent,
-                                  Color(0xFF0A0A0A),
+                                  scheme.surfaceContainerLowest,
                                 ],
                               ),
                             ),
@@ -608,11 +567,12 @@ class _ArtistPopup extends ConsumerWidget {
                       child: asyncInfo.when(
                         data: (info) {
                           if (info == null || info.extract.isEmpty) {
-                            return const Padding(
-                              padding: EdgeInsets.all(20),
+                            return Padding(
+                              padding: const EdgeInsets.all(20),
                               child: Text(
                                 'Aucune information disponible sur Wikipedia.',
-                                style: TextStyle(color: Colors.white38),
+                                style: TextStyle(
+                                    color: scheme.onSurfaceVariant.withValues(alpha: 0.6)),
                                 textAlign: TextAlign.center,
                               ),
                             );
@@ -624,8 +584,8 @@ class _ArtistPopup extends ConsumerWidget {
                               children: [
                                 Text(
                                   info.extract,
-                                  style: const TextStyle(
-                                    color: Colors.white70,
+                                  style: TextStyle(
+                                    color: scheme.onSurfaceVariant,
                                     fontSize: 14,
                                     height: 1.5,
                                   ),
@@ -640,11 +600,12 @@ class _ArtistPopup extends ConsumerWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         ),
-                        error: (_, __) => const Padding(
-                          padding: EdgeInsets.all(20),
+                        error: (_, __) => Padding(
+                          padding: const EdgeInsets.all(20),
                           child: Text(
                             'Impossible de charger les informations.',
-                            style: TextStyle(color: Colors.white38),
+                            style: TextStyle(
+                                color: scheme.onSurfaceVariant.withValues(alpha: 0.6)),
                             textAlign: TextAlign.center,
                           ),
                         ),

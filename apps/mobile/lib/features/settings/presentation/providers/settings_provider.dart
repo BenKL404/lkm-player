@@ -221,7 +221,7 @@ class AccentColorSetting extends _$AccentColorSetting {
 
 /// URL de base de l'API Telegramusic.
 /// Défaut utilisé si l'utilisateur n'a rien configuré dans Paramètres.
-const String kDownloadApiBaseUrlDefault = 'https://lkm.emmanuekebeh.dev';
+const String kDownloadApiBaseUrlDefault = 'https://lkmplayerapi.lkfondation.com';
 
 @riverpod
 class DownloadApiBaseUrl extends _$DownloadApiBaseUrl {
@@ -236,6 +236,26 @@ class DownloadApiBaseUrl extends _$DownloadApiBaseUrl {
 
   Future<void> setBaseUrl(String url) async {
     final trimmed = url.trim();
+    state = AsyncValue.data(trimmed);
+    await _prefs.setString(_key, trimmed);
+  }
+}
+
+/// Clé API (X-API-Key) de l'API LKM Player, si le serveur en exige une.
+/// Vide par défaut (l'API reste utilisable sans clé si elle n'en réclame pas).
+@riverpod
+class DownloadApiKey extends _$DownloadApiKey {
+  late SharedPreferences _prefs;
+  static const _key = 'download_api_key';
+
+  @override
+  Future<String> build() async {
+    _prefs = await SharedPreferences.getInstance();
+    return _prefs.getString(_key) ?? '';
+  }
+
+  Future<void> setApiKey(String apiKey) async {
+    final trimmed = apiKey.trim();
     state = AsyncValue.data(trimmed);
     await _prefs.setString(_key, trimmed);
   }

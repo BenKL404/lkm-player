@@ -26,8 +26,11 @@ class AlbumArtImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = borderRadius ?? BorderRadius.circular(8);
 
-    // URI content:// MediaStore
-    if (albumArtPath != null && albumArtPath!.startsWith('content://')) {
+    // URI content:// MediaStore, ou pochette distante (résultats de recherche en ligne).
+    if (albumArtPath != null &&
+        (albumArtPath!.startsWith('content://') ||
+            albumArtPath!.startsWith('http://') ||
+            albumArtPath!.startsWith('https://'))) {
       return ClipRRect(
         borderRadius: radius,
         child: Image.network(
@@ -102,8 +105,17 @@ class AlbumArtImageLarge extends StatelessWidget {
     final radius = BorderRadius.circular(16);
     Widget child;
 
+    // Décoder à une résolution proche de l'affichage (pas la résolution native
+    // de la pochette, potentiellement bien plus grande) : évite les à-coups
+    // pendant les transitions de page (Hero, SliverAppBar).
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final cachePx = (size.isFinite ? size * dpr : 600).round();
+
     // Utiliser directement la pochette si disponible
-    if (albumArtPath != null && albumArtPath!.startsWith('content://')) {
+    if (albumArtPath != null &&
+        (albumArtPath!.startsWith('content://') ||
+            albumArtPath!.startsWith('http://') ||
+            albumArtPath!.startsWith('https://'))) {
       child = ClipRRect(
         borderRadius: radius,
         child: Image.network(
@@ -111,6 +123,8 @@ class AlbumArtImageLarge extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
+          cacheWidth: cachePx,
+          cacheHeight: cachePx,
         ),
       );
     } else if (albumArtPath != null && File(albumArtPath!).existsSync()) {
@@ -121,16 +135,33 @@ class AlbumArtImageLarge extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
+          cacheWidth: cachePx,
+          cacheHeight: cachePx,
         ),
       );
     } else {
-      // Aucun cover: pas de carré coloré, juste une icône centrée
-      child = Center(
-        child: Icon(
-          Icons.music_note,
-          size: size * 0.45,
-          color:
-              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+      // Aucun cover : dégradé "aura" (teal -> secondaire) au lieu d'un fond plat.
+      final scheme = Theme.of(context).colorScheme;
+      child = ClipRRect(
+        borderRadius: radius,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                scheme.surfaceContainerHigh,
+                scheme.primaryContainer.withValues(alpha: 0.55),
+              ],
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              Icons.music_note,
+              size: size * 0.45,
+              color: scheme.onSurface.withValues(alpha: 0.85),
+            ),
+          ),
         ),
       );
     }

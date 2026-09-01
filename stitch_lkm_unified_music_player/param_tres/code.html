@@ -1,0 +1,389 @@
+<!DOCTYPE html><html class="dark" lang="fr"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Paramètres - LKM Player</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#201f1f",
+                        "surface": "#131313",
+                        "on-secondary": "#68000f",
+                        "background": "#131313",
+                        "on-tertiary-fixed": "#211b00",
+                        "outline-variant": "#3d4948",
+                        "on-primary-container": "#00544f",
+                        "surface-dim": "#131313",
+                        "secondary": "#ffb3b0",
+                        "surface-variant": "#353534",
+                        "primary-container": "#4ecdc4",
+                        "on-tertiary": "#393000",
+                        "on-background": "#e5e2e1",
+                        "inverse-on-surface": "#313030",
+                        "tertiary": "#eed65f",
+                        "primary-fixed-dim": "#5dd9d0",
+                        "on-primary-fixed": "#00201e",
+                        "surface-container-low": "#1c1b1b",
+                        "on-primary-fixed-variant": "#00504c",
+                        "tertiary-container": "#d1ba46",
+                        "surface-bright": "#3a3939",
+                        "inverse-primary": "#006a65",
+                        "secondary-container": "#901822",
+                        "surface-tint": "#5dd9d0",
+                        "on-surface": "#e5e2e1",
+                        "inverse-surface": "#e5e2e1",
+                        "on-error": "#690005",
+                        "surface-container-highest": "#353534",
+                        "on-secondary-fixed-variant": "#8c1520",
+                        "tertiary-fixed": "#fbe36a",
+                        "error-container": "#93000a",
+                        "outline": "#869391",
+                        "on-tertiary-fixed-variant": "#524600",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-container": "#564a00",
+                        "secondary-fixed": "#ffdad8",
+                        "on-secondary-container": "#ff9e9b",
+                        "on-secondary-fixed": "#410006",
+                        "surface-container-high": "#2a2a2a",
+                        "tertiary-fixed-dim": "#dec651",
+                        "secondary-fixed-dim": "#ffb3b0",
+                        "primary-fixed": "#7cf6ec",
+                        "surface-container-lowest": "#0e0e0e",
+                        "primary": "#6ee9e0",
+                        "on-primary": "#003734",
+                        "on-surface-variant": "#bcc9c7",
+                        "error": "#ffb4ab"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap-sm": "8px",
+                        "stack-gap-lg": "24px",
+                        "stack-gap-md": "16px",
+                        "container-padding": "20px",
+                        "album-art-size": "calc(100vw - 40px)"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Lexend"],
+                        "body-md": ["Lexend"],
+                        "title-sm": ["Lexend"],
+                        "headline-md": ["Lexend"],
+                        "label-sm": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "title-sm": ["18px", { "lineHeight": "24px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .glass-panel {
+            background: rgba(42, 42, 42, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: theme('colors.surface-variant');
+            border-radius: theme('borderRadius.full');
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: theme('colors.outline');
+        }
+
+        /* Toggle Switch CSS */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: theme('colors.primary');
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: theme('colors.primary');
+        }
+        .toggle-checkbox:checked + .toggle-label:after {
+            transform: translateX(100%);
+            border-color: theme('colors.on-primary');
+            background-color: theme('colors.on-primary');
+        }
+        .toggle-label {
+            width: 48px;
+            height: 24px;
+            background-color: theme('colors.surface-variant');
+            border-radius: 9999px;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .toggle-label:after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background-color: theme('colors.on-surface-variant');
+            border-radius: 50%;
+            transition: transform 0.3s, background-color 0.3s;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col pb-24 md:pb-0 md:flex-row overflow-x-hidden bg-surface-container-lowest">
+<!-- TopAppBar (Mobile/Tablet) -->
+<header class="flex justify-between items-center px-container-padding h-16 w-full z-40 bg-surface dark:bg-surface md:hidden sticky top-0">
+<button aria-label="Menu" class="p-2 -ml-2 text-primary dark:text-primary hover:opacity-80 transition-opacity duration-200 active:scale-95">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary">Paramètres</h1>
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-variant">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A macro photography shot of a high-end audio equipment knob, showcasing tactile brushed metal textures and subtle indicator lights in a moody, dark studio environment. The lighting is cinematic, highlighting the precision and premium quality of the gear." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcxR-ELY0qtSIhbd4FJHlsprO_LS9T8YWY853EoTJ5CZtA88d5eAYC5dH3R4OEpoEoMmRfeRQwbh4PDJttp7-vaMrCuBlyeF2VjPO3O8QTL3opzxCicseysC4bbIq7JpXmBBBAr9lwzh9CJ4jAyZXRjD6JcsFO7M-iovHuwn_mAG7w1yRlQV8ENbLqwkOHZTP5_IYtpfT0x_d9KDil6suNLMuprxjZiCdmvyg1DHxF7HTFR0i14zcsKg">
+</div>
+</header>
+<!-- Side Navigation (Desktop) - Reusing Drawer Logic for Web layout -->
+<nav class="hidden md:flex flex-col h-screen w-80 bg-surface-container-high dark:bg-surface-container-high sticky top-0 z-[60] shadow-xl p-4 shrink-0">
+<!-- Profile Header -->
+<div class="flex items-center gap-4 mb-stack-lg p-2">
+<div class="w-14 h-14 rounded-full overflow-hidden bg-surface-variant shrink-0">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A macro photography shot of a high-end audio equipment knob, showcasing tactile brushed metal textures and subtle indicator lights in a moody, dark studio environment. The lighting is cinematic, highlighting the precision and premium quality of the gear." src="https://lh3.googleusercontent.com/aida-public/AB6AXuANr-M8SvjuROc3z79fr-HZKQ-CxigEgTBwcdL0q0-BrtUaESa6ExatrmlX4JQWGpazQyRRCgvJrFWh3s8I-IM_n1-F1W5GUZF6j3fmJTSOHFb9ZtGB5yO3NFpGdBxn7QqkxVS7TIicuKDYR0_yrNwmbQN4CpIgAh_hl9LH9eGvDwV6zlg2sQZxh4V2cHytOIvX6-CbqNdzjsYPk3mdlmunrXP4LWecK6sgwv1ajLdCMIEiGfSdwbc86A">
+</div>
+<div class="flex flex-col">
+<span class="font-title-sm text-title-sm text-on-surface">Audiophile Pro</span>
+<span class="font-label-sm text-label-sm text-primary">Premium Member</span>
+</div>
+</div>
+<!-- Navigation Links -->
+<ul class="flex flex-col gap-2 flex-grow">
+<li class="">
+<a class="flex items-center gap-3 p-3 rounded-lg text-on-surface hover:bg-surface-variant hover:bg-surface-bright transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">equalizer</span>
+<span class="font-body-md text-body-md">Equalizer</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 p-3 rounded-lg text-on-surface hover:bg-surface-variant hover:bg-surface-bright transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">bedtime</span>
+<span class="font-body-md text-body-md">Sleep Timer</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 p-3 rounded-lg text-on-surface hover:bg-surface-variant hover:bg-surface-bright transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">download_done</span>
+<span class="font-body-md text-body-md">Offline Mode</span>
+</a>
+</li>
+<li class="">
+<!-- Active State applied here based on intent -->
+<a class="flex items-center gap-3 p-3 rounded-lg bg-secondary-container text-on-secondary-container hover:bg-surface-bright transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</li>
+<li class="mt-auto">
+<a class="flex items-center gap-3 p-3 rounded-lg text-on-surface hover:bg-surface-variant hover:bg-surface-bright transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">help</span>
+<span class="font-body-md text-body-md">Help</span>
+</a>
+</li>
+</ul>
+<div class="mt-4 p-2 text-center border-t border-outline-variant/30">
+<span class="font-label-sm text-label-sm text-on-surface-variant">v2.4.0</span>
+</div>
+</nav>
+<!-- Main Canvas -->
+<main class="flex-1 px-container-padding py-stack-lg max-w-4xl mx-auto w-full flex flex-col gap-stack-lg">
+<!-- Desktop Header (Hidden on Mobile) -->
+<div class="hidden md:block mb-stack-md">
+<h1 class="font-display-lg text-display-lg text-on-surface">Paramètres</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Gérez vos préférences audio et votre compte LKM Player.</p>
+</div>
+<!-- Profil (Premium) Bento Item -->
+<section class="rounded-xl p-6 flex flex-col sm:flex-row items-center sm:items-start gap-6 relative overflow-hidden group border-b">
+<div class="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+<div class="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-primary/30 relative z-10 shrink-0">
+<img alt="User avatar large" class="w-full h-full object-cover" data-alt="A close-up of a sophisticated audio mixing console in a dimly lit studio. The focus is on a glowing teal LED level meter, contrasting against the matte black finish of the equipment. The mood is focused and professional, indicative of high-fidelity sound engineering." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaZ7sXV-6qu3AwiL0ifx1kLN02H3Wce55fn0hFIWMMTY8MyiYsBt9FGL4ePcXJM7q_WiDNH9UG6BDVNv86QP_s5yCK6D5a0XjLfM7DlGo2o9ZrOjb1H1tRn0vlgsts7xqv-AXFu__kzz1tu2p0rJ2YTA2EVfIl32Uk-1nkgcr7wIaPYw4zosXSgtj8Ph0ymcCVkN7mLhUTrtpRiLS0iuYIpWXuztIR40-h55hs-0vBtg-psZoVU_nr-g">
+</div>
+<div class="flex-1 flex flex-col items-center sm:items-start text-center sm:text-left z-10">
+<div class="flex items-center gap-2 mb-1">
+<h2 class="font-headline-md text-headline-md text-on-surface">Alexandre L.</h2>
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<p class="font-body-md text-body-md text-primary font-medium mb-4">LKM Premium</p>
+<div class="flex gap-4">
+<button class="bg-surface-variant hover:bg-surface-bright text-on-surface font-title-sm text-title-sm px-6 py-2 rounded-full transition-colors">Modifier Profil</button>
+<button class="text-primary hover:text-primary-container font-title-sm text-title-sm px-4 py-2 transition-colors">Gérer l'abonnement</button>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-lg">
+<!-- Audio Settings -->
+<section class="rounded-xl p-6 flex flex-col gap-6 border">
+<div class="flex items-center gap-3 border-b border-outline-variant/30 pb-4">
+<span class="material-symbols-outlined text-primary text-3xl">graphic_eq</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Audio</h3>
+</div>
+<div class="flex flex-col gap-4">
+<div class="flex justify-between items-center group cursor-pointer">
+<div>
+<p class="font-title-sm text-title-sm text-on-surface group-hover:text-primary transition-colors">Égaliseur</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Personnalisé (Basses amplifiées)</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</div>
+<div class="flex justify-between items-center group cursor-pointer">
+<div>
+<p class="font-title-sm text-title-sm text-on-surface group-hover:text-primary transition-colors">Qualité de streaming</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Lossless (Hi-Res)</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</div>
+<div class="flex justify-between items-center mt-2">
+<div>
+<p class="font-title-sm text-title-sm text-on-surface">Normalisation du volume</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Niveau constant entre les pistes</p>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer opacity-0 z-10" id="toggle-vol" name="toggle" type="checkbox">
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer" for="toggle-vol"></label>
+</div>
+</div>
+</div>
+</section>
+<!-- Sources -->
+<section class="rounded-xl p-6 flex flex-col gap-6 border">
+<div class="flex items-center gap-3 border-b border-outline-variant/30 pb-4">
+<span class="material-symbols-outlined text-primary text-3xl">cast_connected</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Sources Connectées</h3>
+</div>
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface hover:bg-surface-bright transition-colors cursor-pointer border border-outline-variant/20">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface">
+<span class="font-bold">D</span>
+</div>
+<div>
+<p class="font-title-sm text-title-sm text-on-surface">Deezer</p>
+<p class="font-label-sm text-label-sm text-primary">Connecté</p>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined">link_off</span>
+</button>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface hover:bg-surface-bright transition-colors cursor-pointer border border-outline-variant/20">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface">
+<span class="font-bold">S</span>
+</div>
+<div>
+<p class="font-title-sm text-title-sm text-on-surface">SoundCloud</p>
+<p class="font-label-sm text-label-sm text-primary">Connecté</p>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined">link_off</span>
+</button>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface hover:bg-surface-bright transition-colors cursor-pointer border border-outline-variant/20 border-dashed">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
+<span class="font-bold">Y</span>
+</div>
+<div>
+<p class="font-title-sm text-title-sm text-on-surface-variant">YouTube Music</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Non connecté</p>
+</div>
+</div>
+<button class="text-primary hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined">add_link</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Stockage -->
+<section class="rounded-xl p-6 flex flex-col gap-6 border">
+<div class="flex items-center gap-3 border-b border-outline-variant/30 pb-4">
+<span class="material-symbols-outlined text-primary text-3xl">storage</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Stockage &amp; Cache</h3>
+</div>
+<div class="flex flex-col gap-6">
+<div>
+<div class="flex justify-between items-end mb-2">
+<p class="font-title-sm text-title-sm text-on-surface">Téléchargements</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">12.4 GB / 64 GB</p>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 20%"></div>
+</div>
+<div class="mt-3 flex gap-2">
+<button class="bg-surface hover:bg-surface-bright border border-outline-variant/30 text-on-surface font-label-sm text-label-sm px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">folder_delete</span> Vider
+                            </button>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-end mb-2">
+<p class="font-title-sm text-title-sm text-on-surface">Cache Audio</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">450 MB</p>
+</div>
+<div class="mt-2 flex gap-2">
+<button class="bg-surface hover:bg-surface-bright border border-outline-variant/30 text-on-surface font-label-sm text-label-sm px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">cleaning_services</span> Effacer le cache
+                            </button>
+</div>
+</div>
+</div>
+</section>
+<!-- À propos -->
+<section class="rounded-xl p-6 flex flex-col gap-6 justify-between border">
+<div>
+<div class="flex items-center gap-3 border-b border-outline-variant/30 pb-4 mb-4">
+<span class="material-symbols-outlined text-primary text-3xl">info</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">À propos</h3>
+</div>
+<div class="flex flex-col gap-3">
+<a class="font-body-md text-body-md text-on-surface hover:text-primary transition-colors" href="#">Politique de confidentialité</a>
+<a class="font-body-md text-body-md text-on-surface hover:text-primary transition-colors" href="#">Conditions d'utilisation</a>
+<a class="font-body-md text-body-md text-on-surface hover:text-primary transition-colors" href="#">Mentions légales</a>
+</div>
+</div>
+<div class="flex items-center justify-center flex-col pt-6 opacity-50">
+<span class="font-headline-md text-headline-md font-bold text-on-surface tracking-widest mb-1">LKM</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Version 2.4.0 (Build 8492)</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-1">© 2024 LKM Audio Systems</span>
+</div>
+</section>
+</div>
+</main>
+<!-- Suppressed BottomNavBar and FAB based on instructions for Settings/Transactional pages -->
+
+
+</body></html>

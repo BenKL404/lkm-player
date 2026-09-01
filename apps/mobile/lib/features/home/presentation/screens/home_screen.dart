@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:musio/core/routing/app_router.dart';
-import 'package:musio/features/for_you/presentation/screens/for_you_screen.dart';
 import 'package:musio/features/music/data/models/album_model.dart';
+import 'package:musio/features/music/data/models/artist_model.dart';
 import 'package:musio/features/music/data/models/playlist_model.dart';
 import 'package:musio/features/music/data/models/song_model.dart';
 import 'package:musio/features/music/presentation/providers/music_provider.dart';
 import 'package:musio/features/playlist/data/system_playlist.dart';
 import 'package:musio/features/settings/presentation/providers/settings_provider.dart';
+import 'package:musio/shared/widgets/album_art_image.dart';
 import 'package:musio/shared/widgets/album_card.dart';
+import 'package:musio/shared/widgets/artist_card.dart';
 import 'package:musio/shared/widgets/mini_player.dart';
+import 'package:musio/shared/widgets/song_card.dart';
 import 'package:musio/shared/widgets/song_tile.dart';
 
 import '../../../player/presentation/providers/audio_player_provider.dart';
@@ -150,12 +153,8 @@ class _OfflineHomeScreenState extends ConsumerState<OfflineHomeScreen> {
             ? selectedAlbumIds.length
             : 0;
 
-    const titles = <String>[
-      'Pour moi',
-      'Albums',
-      'Titres',
-      'Playlists',
-    ];
+    const categories = <String>['Playlists', 'Artistes', 'Albums', 'Titres'];
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: isSelectionActive
@@ -185,14 +184,29 @@ class _OfflineHomeScreenState extends ConsumerState<OfflineHomeScreen> {
             )
           : AppBar(
               automaticallyImplyLeading: false,
-              title: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child: Text(
-                  titles[_currentIndex],
-                  key: ValueKey<int>(_currentIndex),
-                ),
+              leading: _buildMenuButton(context, ref),
+              title: Text(
+                'LKM Player',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
-              actions: _buildAppBarActions(context, ref),
+              centerTitle: true,
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: GestureDetector(
+                    onTap: () => context.push(AppRouter.settings),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: scheme.primaryContainer,
+                      child: Icon(Icons.person,
+                          color: scheme.onPrimaryContainer, size: 20),
+                    ),
+                  ),
+                ),
+              ],
             ),
       body: musicState.when(
         data: (state) {
@@ -213,13 +227,29 @@ class _OfflineHomeScreenState extends ConsumerState<OfflineHomeScreen> {
             return _buildEmptyState();
           }
 
-          return IndexedStack(
-            index: _currentIndex,
+          return Column(
             children: [
-              const ForYouScreen(),
-              _buildAlbumsTab(state.albums),
-              _buildSongsTab(state.songs),
-              _buildPlaylistsTab(state.playlists, state.songs),
+              _LibraryChipRow(
+                categories: categories,
+                selectedIndex: _currentIndex,
+                onSelected: (index) {
+                  if (ref.read(selectionModeProvider) != null) {
+                    _clearSelection();
+                  }
+                  setState(() => _currentIndex = index);
+                },
+              ),
+              Expanded(
+                child: IndexedStack(
+                  index: _currentIndex,
+                  children: [
+                    _buildPlaylistsTab(state.playlists, state.songs),
+                    _buildArtistsTab(state.artists),
+                    _buildAlbumsTab(state.albums),
+                    _buildSongsTab(state.songs),
+                  ],
+                ),
+              ),
             ],
           );
         },
@@ -241,65 +271,25 @@ class _OfflineHomeScreenState extends ConsumerState<OfflineHomeScreen> {
           ),
         ),
       ),
-      floatingActionButton: _currentIndex == 3
+      floatingActionButton: _currentIndex == 0
           ? FloatingActionButton.extended(
               onPressed: () => _showCreatePlaylistDialog(context, ref),
               label: const Text('Créer une playlist'),
               icon: const Icon(Icons.add),
             )
           : null,
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const MiniPlayer(),
-            NavigationBar(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                if (ref.read(selectionModeProvider) != null) {
-                  _clearSelection();
-                }
-                setState(() => _currentIndex = index);
-              },
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.auto_awesome_outlined),
-                  selectedIcon: Icon(Icons.auto_awesome),
-                  label: 'Pour moi',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.album_outlined),
-                  selectedIcon: Icon(Icons.album),
-                  label: 'Albums',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.music_note_outlined),
-                  selectedIcon: Icon(Icons.music_note),
-                  label: 'Titres',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.queue_music_outlined),
-                  selectedIcon: Icon(Icons.queue_music),
-                  label: 'Playlists',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+      bottomNavigationBar: const MiniPlayer(),
     );
   }
 
-  List<Widget> _buildAppBarActions(BuildContext context, WidgetRef ref) {
+  Widget _buildMenuButton(BuildContext context, WidgetRef ref) {
     final isOnlineEnabled =
         ref.watch(onlineFeatureEnabledProvider).valueOrNull ?? false;
     final isSongList = ref.watch(songDisplayModeProvider);
 
-    return [
-      PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert),
-        tooltip: 'Plus d\'options',
+    return PopupMenuButton<String>(
+        icon: const Icon(Icons.menu_rounded),
+        tooltip: 'Menu',
         onSelected: _handleMenuAction,
         itemBuilder: (context) {
           final menuItems = <PopupMenuEntry<String>>[];
@@ -352,7 +342,7 @@ class _OfflineHomeScreenState extends ConsumerState<OfflineHomeScreen> {
             ),
           ]);
 
-          if (_currentIndex == 1) {
+          if (_currentIndex == 2) {
             menuItems.addAll([
               const PopupMenuDivider(),
               const PopupMenuItem(
@@ -367,7 +357,7 @@ class _OfflineHomeScreenState extends ConsumerState<OfflineHomeScreen> {
               ),
             ]);
           }
-          if (_currentIndex == 2) {
+          if (_currentIndex == 3) {
             menuItems.addAll([
               const PopupMenuDivider(),
               PopupMenuItem(
@@ -384,8 +374,7 @@ class _OfflineHomeScreenState extends ConsumerState<OfflineHomeScreen> {
           }
           return menuItems;
         },
-      ),
-    ];
+      );
   }
 
   Widget _buildSongsTab(List<SongModel> songs) {
@@ -605,15 +594,131 @@ class _OfflineHomeScreenState extends ConsumerState<OfflineHomeScreen> {
     );
   }
 
+  Widget _buildArtistsTab(List<ArtistModel> artists) {
+    if (artists.isEmpty) {
+      return _buildEmptyState();
+    }
+    return RefreshIndicator(
+      onRefresh: () async {
+        await ref.read(musicProvider.notifier).rescanLibrary();
+      },
+      child: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 0.7,
+        ),
+        itemCount: artists.length,
+        itemBuilder: (context, index) => ArtistCard(artist: artists[index]),
+      ),
+    );
+  }
+
   Widget _buildPlaylistsTab(
       List<PlaylistModel> playlists, List<SongModel> songs) {
     final favoritesCount = songs.where((s) => s.isFavorite).length;
     final recentCount = songs.where((s) => s.lastPlayed != null).length;
     final mostPlayedCount = songs.where((s) => s.playCount > 0).length;
+    final favoriteSongs = songs.where((s) => s.isFavorite).toList();
+    final recentlyAdded = List<SongModel>.from(songs)
+      ..sort((a, b) => (b.dateAdded ?? 0).compareTo(a.dateAdded ?? 0));
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 140),
       children: [
+        if (favoriteSongs.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Icon(Icons.favorite_rounded,
+                    color: Theme.of(context).colorScheme.primaryContainer, size: 20),
+                const SizedBox(width: 8),
+                Text('Favoris Locaux', style: Theme.of(context).textTheme.titleLarge),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.85,
+              ),
+              itemCount: favoriteSongs.take(6).length,
+              itemBuilder: (context, index) {
+                final song = favoriteSongs[index];
+                return SongCard(
+                  song: song,
+                  onTap: () => ref
+                      .read(audioPlayerProvider.notifier)
+                      .play(favoriteSongs, index),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (recentlyAdded.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Ajouts Récents', style: Theme.of(context).textTheme.titleLarge),
+                InkWell(
+                  onTap: () => context.push(
+                    AppRouter.songList,
+                    extra: {'title': 'Ajouts récents', 'songs': recentlyAdded},
+                  ),
+                  child: Text(
+                    'Voir tout',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...recentlyAdded.take(4).map(
+                (song) => ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: AlbumArtImage(
+                      albumArtPath: song.albumArtPath,
+                      songId: song.id,
+                      size: 48,
+                    ),
+                  ),
+                  title: Text(
+                    song.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  subtitle: Text(
+                    song.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  onTap: () => ref
+                      .read(audioPlayerProvider.notifier)
+                      .play(recentlyAdded, recentlyAdded.indexOf(song)),
+                ),
+              ),
+          const Divider(height: 32, indent: 16, endIndent: 16),
+        ],
         // Playlists système
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -836,6 +941,57 @@ extension on SongModel {
       year: year,
       songIds: [id],
       trackCount: 1,
+    );
+  }
+}
+
+/// Rangée de puces pour choisir la catégorie affichée (Albums / Titres /
+/// Playlists), remplace l'ancienne barre de navigation interne — la
+/// sélection de catégorie n'a plus besoin de sa propre bottom bar
+/// maintenant que la Bibliothèque est un onglet parmi d'autres.
+class _LibraryChipRow extends StatelessWidget {
+  final List<String> categories;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  const _LibraryChipRow({
+    required this.categories,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final selected = index == selectedIndex;
+          return ChoiceChip(
+            label: Text(categories[index]),
+            selected: selected,
+            onSelected: (_) => onSelected(index),
+            showCheckmark: false,
+            labelStyle: textTheme.labelLarge?.copyWith(
+              color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            ),
+            backgroundColor: scheme.surfaceContainerHigh,
+            selectedColor: scheme.primaryContainer,
+            side: BorderSide(
+              color: selected ? Colors.transparent : scheme.outlineVariant,
+            ),
+            shape: const StadiumBorder(),
+          );
+        },
+      ),
     );
   }
 }

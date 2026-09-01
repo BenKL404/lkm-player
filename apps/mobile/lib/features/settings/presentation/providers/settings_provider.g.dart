@@ -238,5 +238,24 @@ final downloadApiBaseUrlProvider =
 );
 
 typedef _$DownloadApiBaseUrl = AutoDisposeAsyncNotifier<String>;
+String _$downloadApiKeyHash() => r'3d407d9a3301b8482b6818d643657570c16d982e';
+
+/// Clé API (X-API-Key) de l'API LKM Player, si le serveur en exige une.
+/// Vide par défaut (l'API reste utilisable sans clé si elle n'en réclame pas).
+///
+/// Copied from [DownloadApiKey].
+@ProviderFor(DownloadApiKey)
+final downloadApiKeyProvider =
+    AutoDisposeAsyncNotifierProvider<DownloadApiKey, String>.internal(
+  DownloadApiKey.new,
+  name: r'downloadApiKeyProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$downloadApiKeyHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$DownloadApiKey = AutoDisposeAsyncNotifier<String>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

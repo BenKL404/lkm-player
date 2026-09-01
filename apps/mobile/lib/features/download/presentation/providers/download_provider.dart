@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../music/data/models/song_model.dart';
 import '../../../music/presentation/providers/music_provider.dart';
+import '../../../player/presentation/providers/audio_player_provider.dart';
 import '../../data/download_cancel_token.dart';
 import '../../data/models/deezer_search_result.dart';
 import '../../data/telegramusic_api_client.dart';
@@ -16,7 +17,8 @@ import '../../data/telegramusic_api_client.dart';
 final downloadApiClientProvider = Provider<TelegramusicApiClient?>((ref) {
   final baseUrl = ref.watch(downloadApiBaseUrlProvider).valueOrNull ?? '';
   if (baseUrl.isEmpty) return null;
-  return TelegramusicApiClient(baseUrl: baseUrl);
+  final apiKey = ref.watch(downloadApiKeyProvider).valueOrNull ?? '';
+  return TelegramusicApiClient(baseUrl: baseUrl, apiKey: apiKey);
 });
 
 /// Chemin du dossier où sont enregistrées les pistes téléchargées (Téléchargements/Musio).
@@ -28,29 +30,46 @@ Future<String> getDownloadDirectoryPath() async {
 /// Provider exposant le chemin du dossier de téléchargement (pour l’affichage dans Paramètres).
 final downloadDirectoryPathProvider = FutureProvider<String>((ref) => getDownloadDirectoryPath());
 
-/// État de la recherche en ligne (Deezer).
+/// Source à filtrer dans les résultats affichés (l'API interroge toujours
+/// tout le monde ; le filtre ne fait que changer ce qui est montré/relancé).
+/// `local` ne touche pas l'API : il cherche directement dans la bibliothèque
+/// locale déjà en cache (fichiers déjà sur l'appareil).
+enum SearchSourceFilter { all, deezer, youtube, soundcloud, local }
+
+/// État de la recherche en ligne unifiée (Deezer / YouTube / SoundCloud / Local).
 class OnlineSearchState {
   const OnlineSearchState({
     this.results = const [],
     this.albumResults = const [],
+    this.localResults = const [],
+    this.sourceFilter = SearchSourceFilter.all,
     this.isLoading = false,
     this.error,
   });
 
+  /// Pistes toutes sources confondues (Deezer + YouTube + SoundCloud).
   final List<DeezerSearchResult> results;
   final List<DeezerSearchResult> albumResults;
+  /// Résultats pour le filtre `local` : morceaux déjà présents dans la
+  /// bibliothèque de l'appareil (indépendant de l'API en ligne).
+  final List<SongModel> localResults;
+  final SearchSourceFilter sourceFilter;
   final bool isLoading;
   final String? error;
 
   OnlineSearchState copyWith({
     List<DeezerSearchResult>? results,
     List<DeezerSearchResult>? albumResults,
+    List<SongModel>? localResults,
+    SearchSourceFilter? sourceFilter,
     bool? isLoading,
     String? error,
   }) {
     return OnlineSearchState(
       results: results ?? this.results,
       albumResults: albumResults ?? this.albumResults,
+      localResults: localResults ?? this.localResults,
+      sourceFilter: sourceFilter ?? this.sourceFilter,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
@@ -66,6 +85,7 @@ class OnlineSearchNotifier extends StateNotifier<OnlineSearchState> {
   OnlineSearchNotifier(this._ref) : super(const OnlineSearchState());
 
   final Ref _ref;
+  String _lastQuery = '';
 
   /// Normalise la requête (trim, espaces multiples → un seul) pour limiter les erreurs / 502.
   static String _normalizeQuery(String q) {
@@ -77,30 +97,66 @@ class OnlineSearchNotifier extends StateNotifier<OnlineSearchState> {
     return normalized.isEmpty ? '' : '$normalized ';
   }
 
+  void setSourceFilter(SearchSourceFilter filter) {
+    state = state.copyWith(sourceFilter: filter);
+    if (_lastQuery.isNotEmpty) search(_lastQuery);
+  }
+
   Future<void> search(String query) async {
     final normalized = _normalizeQuery(query);
+    _lastQuery = normalized;
     if (normalized.isEmpty) {
-      state = state.copyWith(results: [], albumResults: [], error: null);
+      state = state.copyWith(results: [], albumResults: [], localResults: [], error: null);
       return;
     }
+
+    // Filtre "Local" : ne touche pas le réseau, cherche dans la bibliothèque
+    // déjà chargée en cache (titre / artiste / album).
+    if (state.sourceFilter == SearchSourceFilter.local) {
+      final lower = normalized.toLowerCase();
+      final songs = _ref.read(musicProvider).valueOrNull?.songs ?? const <SongModel>[];
+      final matches = songs
+          .where((s) =>
+              s.title.toLowerCase().contains(lower) ||
+              s.artist.toLowerCase().contains(lower) ||
+              s.album.toLowerCase().contains(lower))
+          .toList();
+      state = state.copyWith(
+        results: [],
+        albumResults: [],
+        localResults: matches,
+        isLoading: false,
+        error: null,
+      );
+      return;
+    }
+
     final client = _ref.read(downloadApiClientProvider);
     if (client == null || !client.isConfigured) {
       state = state.copyWith(
         results: [],
         albumResults: [],
+        localResults: [],
         isLoading: false,
         error: 'Configurez le serveur de téléchargement dans Paramètres',
       );
       return;
     }
     final queryForApi = _queryForApi(normalized);
-    state = state.copyWith(isLoading: true, error: null);
+    final providerParam = switch (state.sourceFilter) {
+      SearchSourceFilter.all => 'all',
+      SearchSourceFilter.deezer => 'deezer',
+      SearchSourceFilter.youtube => 'youtube',
+      SearchSourceFilter.soundcloud => 'soundcloud',
+      // Ne devrait pas être atteint (retour anticipé ci-dessus).
+      SearchSourceFilter.local => 'all',
+    };
+    state = state.copyWith(isLoading: true, error: null, localResults: []);
     try {
-      final results = await client.searchResults(queryForApi, type: 'track');
-      final albumResults = await client.searchResults(queryForApi, type: 'album');
+      final unified = await client.unifiedSearch(queryForApi, provider: providerParam);
       state = state.copyWith(
-        results: results,
-        albumResults: albumResults,
+        results: unified.allTracks,
+        albumResults: unified.deezerAlbums,
         isLoading: false,
         error: null,
       );
@@ -116,6 +172,7 @@ class OnlineSearchNotifier extends StateNotifier<OnlineSearchState> {
   }
 
   void clear() {
+    _lastQuery = '';
     state = const OnlineSearchState();
   }
 }
@@ -168,22 +225,37 @@ Future<DownloadResult> downloadTrackAndAddToLibrary(
     return const DownloadResult(error: 'API non configurée');
   }
 
+  final sourcePrefix = track.source.name; // 'deezer' | 'youtube' | 'soundcloud'
+
   ref.read(downloadingTrackIdProvider.notifier).state = track.id;
   ref.read(downloadProgressProvider.notifier).state = 0.0;
   ref.read(downloadingLabelProvider.notifier).state = track.title;
 
   try {
-    final bytes = await client.downloadTrack(
-      track.id,
-      cancelToken: cancelToken,
-      onProgress: (received, total) {
-        if (total != null && total > 0) {
-          final p = received / total;
-          ref.read(downloadProgressProvider.notifier).state = p;
-          onDownloadProgress?.call(p);
-        }
-      },
-    );
+    void onProgress(int received, int? total) {
+      if (total != null && total > 0) {
+        final p = received / total;
+        ref.read(downloadProgressProvider.notifier).state = p;
+        onDownloadProgress?.call(p);
+      }
+    }
+    final bytes = switch (track.source) {
+      ResultSource.deezer => await client.downloadTrack(
+          track.id,
+          cancelToken: cancelToken,
+          onProgress: onProgress,
+        ),
+      ResultSource.youtube => await client.downloadYoutube(
+          track.id,
+          cancelToken: cancelToken,
+          onProgress: onProgress,
+        ),
+      ResultSource.soundcloud => await client.downloadSoundcloud(
+          track.sourceUrl ?? '',
+          cancelToken: cancelToken,
+          onProgress: onProgress,
+        ),
+    };
     if (bytes.isEmpty) {
       return const DownloadResult(error: 'Fichier vide');
     }
@@ -256,19 +328,22 @@ Future<DownloadResult> downloadTrackAndAddToLibrary(
         final appDir = await getApplicationDocumentsDirectory();
         final artDir = Directory(path.join(appDir.path, 'album_artworks'));
         if (!await artDir.exists()) await artDir.create(recursive: true);
-        final artPath = path.join(artDir.path, 'deezer_${track.id}.jpg');
+        final artPath = path.join(artDir.path, '${sourcePrefix}_${track.id}.jpg');
         await File(artPath).writeAsBytes(pictures.first.bytes);
         albumArtPath = artPath;
       }
     } catch (_) {
       // Garder les valeurs par défaut si la lecture échoue
     }
+    // Pas de pochette embarquée (fréquent pour YouTube/SoundCloud) : garder
+    // celle affichée dans les résultats de recherche plutôt que rien.
+    albumArtPath ??= track.imgUrl;
 
-    final songId = 'deezer_${track.id}';
+    final songId = '${sourcePrefix}_${track.id}';
     // Même clé d'album que le ZIP (id Deezer) pour regrouper les pistes téléchargées à la pièce.
     final libraryAlbumId = (track.deezerAlbumId != null && track.deezerAlbumId!.isNotEmpty)
         ? track.deezerAlbumId!
-        : 'deezer_track_${track.id}';
+        : '${sourcePrefix}_track_${track.id}';
     final song = SongModel(
       id: songId,
       title: title,
@@ -280,7 +355,7 @@ Future<DownloadResult> downloadTrackAndAddToLibrary(
       year: year,
       trackNumber: trackNumber,
       albumId: libraryAlbumId,
-      artistId: _deezerArtistId(track.artist),
+      artistId: _sourceArtistId(sourcePrefix, track.artist),
       dateAdded: DateTime.now().millisecondsSinceEpoch ~/ 1000,
     );
 
@@ -395,7 +470,7 @@ Future<DownloadResult> downloadAlbumAndAddToLibrary(
         year: year,
         trackNumber: trackNumber,
         albumId: album.id,
-        artistId: _deezerArtistId(album.artist),
+        artistId: _sourceArtistId('deezer', album.artist),
         dateAdded: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       );
       await repository.addDownloadedSong(song);
@@ -428,8 +503,29 @@ String _sanitizeFileName(String s) {
   return s.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_').trim();
 }
 
-/// Identifiant stable pour grouper les artistes des morceaux téléchargés (Deezer).
-String _deezerArtistId(String artist) {
+/// Identifiant stable pour grouper les artistes des morceaux téléchargés,
+/// par source ('deezer', 'youtube', 'soundcloud').
+String _sourceArtistId(String sourcePrefix, String artist) {
   final safe = artist.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_').trim();
-  return 'deezer_artist_${safe.isEmpty ? 'inconnu' : safe}';
+  return '${sourcePrefix}_artist_${safe.isEmpty ? 'inconnu' : safe}';
+}
+
+/// Écoute [track] en streaming direct, sans le télécharger ni l'ajouter à la
+/// bibliothèque. La piste n'existe que le temps de la lecture.
+Future<void> playStream(WidgetRef ref, DeezerSearchResult track) async {
+  final client = ref.read(downloadApiClientProvider);
+  if (client == null || !client.isConfigured) {
+    throw Exception('Configurez le serveur de téléchargement dans Paramètres');
+  }
+  final url = client.streamUrl(track);
+  final song = SongModel(
+    id: 'stream_${track.source.name}_${track.id}',
+    title: track.displayTitle,
+    artist: track.artist,
+    album: track.album ?? '',
+    path: url,
+    duration: (track.durationSeconds ?? 0) * 1000,
+    albumArtPath: track.imgUrl,
+  );
+  ref.read(audioPlayerProvider.notifier).play([song], 0);
 }

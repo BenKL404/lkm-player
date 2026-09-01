@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -98,65 +98,44 @@ class _TopBar extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final onIcon = scheme.onSurface;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 8),
       child: Row(
         children: [
-          _RoundChrome(
-            child: IconButton(
-              onPressed: () => Navigator.maybePop(context),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded),
-              color: onIcon,
-            ),
+          IconButton(
+            onPressed: () => Navigator.maybePop(context),
+            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
+            color: onIcon,
           ),
           Expanded(
-            child: Text(
-              'Lecture en cours',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: scheme.onSurface,
-                  ),
+            child: Column(
+              children: [
+                Text(
+                  'LECTURE EN COURS',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        letterSpacing: 1.2,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'LKM Player',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.primary,
+                      ),
+                ),
+              ],
             ),
           ),
-          _RoundChrome(
-            child: IconButton(
-              onPressed: () => _showVolumeSheet(context, ref),
-              icon: const Icon(Icons.volume_up_rounded),
-              color: onIcon,
-              tooltip: 'Volume',
-            ),
-          ),
-          const SizedBox(width: 4),
-          _RoundChrome(
-            child: IconButton(
-              onPressed: () => context.push(AppRouter.queue),
-              icon: const Icon(Icons.queue_music_rounded),
-              color: onIcon,
-              tooltip: 'File d\'attente',
-            ),
+          IconButton(
+            onPressed: () => _showVolumeSheet(context, ref),
+            icon: const Icon(Icons.volume_up_rounded),
+            color: onIcon,
+            tooltip: 'Volume',
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _RoundChrome extends StatelessWidget {
-  const _RoundChrome({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surfaceContainerHigh,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: SizedBox(
-        width: 44,
-        height: 44,
-        child: child,
       ),
     );
   }
@@ -214,13 +193,22 @@ class _AlbumCoverCard extends StatelessWidget {
   }
 
   Widget _placeholder(ColorScheme scheme) {
-    return ColoredBox(
-      color: scheme.surfaceContainerHighest,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.surfaceContainerHigh,
+            scheme.primaryContainer.withValues(alpha: 0.55),
+          ],
+        ),
+      ),
       child: Center(
         child: Icon(
           Icons.music_note_rounded,
           size: 80,
-          color: scheme.onSurfaceVariant,
+          color: scheme.onSurface.withValues(alpha: 0.85),
         ),
       ),
     );
@@ -266,23 +254,41 @@ class _TitleRow extends ConsumerWidget {
           ),
         ),
         const SizedBox(width: 12),
-        Material(
-          color: scheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(14),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => context.push(AppRouter.lyrics),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Icon(
-                Icons.lyrics_outlined,
-                color: scheme.primary,
-              ),
-            ),
-          ),
-        ),
+        _FavoriteButton(song: song),
       ],
+    );
+  }
+}
+
+class _FavoriteButton extends ConsumerWidget {
+  const _FavoriteButton({required this.song});
+
+  final SongModel song;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final isFavorite = ref.watch(
+      musicProvider.select(
+        (async) => async.maybeWhen(
+          data: (state) => state.songs
+              .firstWhere((s) => s.id == song.id, orElse: () => song)
+              .isFavorite,
+          orElse: () => song.isFavorite,
+        ),
+      ),
+    );
+
+    return IconButton(
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        ref.read(musicProvider.notifier).toggleFavoriteStatus(song);
+      },
+      icon: Icon(
+        isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+        color: scheme.primary,
+        size: 28,
+      ),
     );
   }
 }
@@ -514,8 +520,9 @@ class _MainTransportRow extends ConsumerWidget {
         const SizedBox(width: 20),
         Material(
           color: scheme.primary,
-          borderRadius: BorderRadius.circular(22),
+          shape: const CircleBorder(),
           elevation: 0,
+          shadowColor: scheme.primary.withValues(alpha: 0.5),
           child: InkWell(
             onTap: () {
               HapticFeedback.lightImpact();
@@ -525,10 +532,19 @@ class _MainTransportRow extends ConsumerWidget {
                 notifier.resume();
               }
             },
-            borderRadius: BorderRadius.circular(22),
-            child: SizedBox(
-              width: 76,
-              height: 76,
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.35),
+                    blurRadius: 24,
+                  ),
+                ],
+              ),
               child: Icon(
                 isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 color: scheme.onPrimary,
@@ -586,19 +602,6 @@ class _BottomActionsPill extends ConsumerWidget {
         ref.watch(audioPlayerProvider.select((s) => s.isShuffled));
     final repeatMode =
         ref.watch(audioPlayerProvider.select((s) => s.repeatMode));
-    final isFavorite = ref.watch(
-      musicProvider.select(
-        (async) => async.maybeWhen(
-          data: (state) => state.songs
-              .firstWhere(
-                (s) => s.id == song.id,
-                orElse: () => song,
-              )
-              .isFavorite,
-          orElse: () => song.isFavorite,
-        ),
-      ),
-    );
 
     final notifier = ref.read(audioPlayerProvider.notifier);
     final scheme = Theme.of(context).colorScheme;
@@ -629,14 +632,14 @@ class _BottomActionsPill extends ConsumerWidget {
             ),
           ),
           IconButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              ref.read(musicProvider.notifier).toggleFavoriteStatus(song);
-            },
-            icon: Icon(
-              isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              color: isFavorite ? active : muted,
-            ),
+            onPressed: () => context.push(AppRouter.lyrics),
+            icon: Icon(Icons.lyrics_outlined, color: muted),
+            tooltip: 'Paroles',
+          ),
+          IconButton(
+            onPressed: () => context.push(AppRouter.queue),
+            icon: Icon(Icons.queue_music_rounded, color: muted),
+            tooltip: 'File d\'attente',
           ),
           IconButton(
             onPressed: () => _showOptionsMenu(context, ref, song),
@@ -827,6 +830,14 @@ void _showOptionsMenu(
                     child: ListView(
                       padding: const EdgeInsets.only(bottom: 20, top: 8),
                       children: [
+                        _OptionTile(
+                          icon: Icons.lyrics_outlined,
+                          label: 'Paroles',
+                          onTap: () {
+                            Navigator.pop(context);
+                            context.push(AppRouter.lyrics);
+                          },
+                        ),
                         _OptionTile(
                           icon: Icons.playlist_add_rounded,
                           label: 'Ajouter à la playlist',

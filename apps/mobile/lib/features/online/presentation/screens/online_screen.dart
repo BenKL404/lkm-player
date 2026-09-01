@@ -7,7 +7,9 @@ import 'package:musio/features/download/data/telegramusic_api_client.dart';
 import 'package:musio/features/download/presentation/providers/download_provider.dart';
 import 'package:musio/features/download/presentation/providers/download_session_provider.dart';
 import 'package:musio/features/download/presentation/widgets/active_downloads_section.dart';
+import 'package:musio/features/player/presentation/providers/audio_player_provider.dart';
 import 'package:musio/shared/widgets/mini_player.dart';
+import 'package:musio/shared/widgets/song_tile.dart';
 
 /// Écran « Découvrir » — recherche Deezer + téléchargement (design LKM unifié).
 class OnlineScreen extends ConsumerStatefulWidget {
@@ -51,62 +53,86 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: scheme.surface,
+        automaticallyImplyLeading: widget.showBackButton,
         leading: widget.showBackButton
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new_rounded),
                 onPressed: () => context.pop(),
               )
-            : null,
-        automaticallyImplyLeading: widget.showBackButton,
-        title: Text(
-          'Découvrir',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
+            : Consumer(
+                builder: (context, ref, _) {
+                  final n = ref.watch(downloadSessionProvider).activeTasks.length;
+                  final label = n > 99 ? '99+' : '$n';
+                  return IconButton(
+                    tooltip: 'Téléchargements${n > 0 ? ' ($n)' : ''}',
+                    onPressed: () => context.push(AppRouter.downloads),
+                    icon: Badge(
+                      isLabelVisible: n > 0,
+                      label: Text(
+                        label,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, height: 1),
+                      ),
+                      padding: n > 9
+                          ? const EdgeInsets.symmetric(horizontal: 5, vertical: 2)
+                          : const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: const Icon(Icons.downloading_rounded),
+                    ),
+                  );
+                },
               ),
-        ),
-        actions: [
-          Consumer(
-            builder: (context, ref, _) {
-              final n = ref.watch(downloadSessionProvider).activeTasks.length;
-              final label = n > 99 ? '99+' : '$n';
-              return IconButton(
-                tooltip: 'Téléchargements${n > 0 ? ' ($n)' : ''}',
-                onPressed: () => context.push(AppRouter.downloads),
-                // Le badge doit envelopper l’icône (pas tout le bouton) pour un placement correct en AppBar.
-                icon: Badge(
-                  isLabelVisible: n > 0,
-                  label: Text(
-                    label,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, height: 1),
+        title: Text(
+          widget.showBackButton ? 'Découvrir' : 'LKM Player',
+          style: widget.showBackButton
+              ? Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  )
+              : Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
                   ),
-                  padding: n > 9
-                      ? const EdgeInsets.symmetric(horizontal: 5, vertical: 2)
-                      : const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  child: const Icon(Icons.downloading_rounded),
+        ),
+        centerTitle: !widget.showBackButton,
+        actions: widget.showBackButton
+            ? null
+            : [
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: GestureDetector(
+                    onTap: () => context.push(AppRouter.settings),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: scheme.primaryContainer,
+                      child: Icon(Icons.person,
+                          color: scheme.onPrimaryContainer, size: 20),
+                    ),
+                  ),
                 ),
-              );
-            },
-          ),
-        ],
+              ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
+          preferredSize: const Size.fromHeight(108),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: _SearchBar(
-              controller: _searchController,
-              focusNode: _focusNode,
-              onChanged: () => setState(() {}),
-              onClear: () {
-                          _searchController.clear();
-                          ref.read(onlineSearchStateProvider.notifier).clear();
-                setState(() {});
-              },
-              onSubmit: (value) {
-                if (value.trim().isNotEmpty) {
-                  ref.read(onlineSearchStateProvider.notifier).search(value.trim());
-                }
-              },
+            child: Column(
+              children: [
+                _SearchBar(
+                  controller: _searchController,
+                  focusNode: _focusNode,
+                  onChanged: () => setState(() {}),
+                  onClear: () {
+                    _searchController.clear();
+                    ref.read(onlineSearchStateProvider.notifier).clear();
+                    setState(() {});
+                  },
+                  onSubmit: (value) {
+                    if (value.trim().isNotEmpty) {
+                      ref.read(onlineSearchStateProvider.notifier).search(value.trim());
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                _SourceFilterChips(selected: searchState.sourceFilter),
+              ],
             ),
           ),
         ),
@@ -133,6 +159,12 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
     String? downloadingAlbumId,
     double? downloadProgress,
   ) {
+    // Filtre "Local" : indépendant du serveur de téléchargement, on cherche
+    // uniquement dans la bibliothèque déjà présente sur l'appareil.
+    if (searchState.sourceFilter == SearchSourceFilter.local) {
+      return _buildLocalResults(searchState);
+    }
+
     if (apiClient == null || !apiClient.isConfigured) {
       return const _StatePage(
         icon: Icons.cloud_off_rounded,
@@ -223,7 +255,9 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
       );
     }
 
-    final tracks = searchState.results.where((r) => r.isTrack).toList();
+    // `results` contient déjà uniquement des pistes (Deezer + YouTube + SoundCloud) :
+    // les albums Deezer sont dans une liste séparée.
+    final tracks = searchState.results;
     final albums = searchState.albumResults.where((r) => r.isAlbum).toList();
 
     return CustomScrollView(
@@ -284,6 +318,7 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                   isDownloading: isDl,
                   progress: isDl ? downloadProgress : null,
                   onDownload: () => _downloadTrack(context, track),
+                  onStream: () => _streamTrack(context, track),
                 );
               },
             ),
@@ -293,8 +328,56 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
     );
   }
 
+  /// Résultats du filtre "Local" : morceaux déjà dans la bibliothèque de
+  /// l'appareil, réutilise [SongTile] (lecture, favoris, menu… déjà en place).
+  Widget _buildLocalResults(OnlineSearchState searchState) {
+    final songs = searchState.localResults;
+    if (songs.isEmpty) {
+      return const _StatePage(
+        icon: Icons.folder_rounded,
+        iconGradient: true,
+        title: 'Bibliothèque locale',
+        subtitle: 'Tape un titre, un artiste ou un album de ta bibliothèque puis valide avec Entrée.',
+      );
+    }
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        SliverToBoxAdapter(
+          child: _SectionTitle(
+            label: 'Bibliothèque locale',
+            count: songs.length,
+            icon: Icons.folder_rounded,
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.only(top: 4, bottom: 100),
+          sliver: SliverList.builder(
+            itemCount: songs.length,
+            itemBuilder: (context, index) => SongTile(
+              song: songs[index],
+              playlist: songs,
+              songIndex: index,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _downloadTrack(BuildContext context, DeezerSearchResult track) async {
     await ref.read(downloadSessionProvider.notifier).enqueue(track);
+  }
+
+  Future<void> _streamTrack(BuildContext context, DeezerSearchResult track) async {
+    try {
+      await playStream(ref, track);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
   Future<void> _downloadAlbum(BuildContext context, DeezerSearchResult album) async {
@@ -666,6 +749,73 @@ class _SearchBar extends StatelessWidget {
   }
 }
 
+/// Puces de filtre par source (Tout / Deezer / YouTube / SoundCloud / Local).
+class _SourceFilterChips extends ConsumerWidget {
+  const _SourceFilterChips({required this.selected});
+
+  final SearchSourceFilter selected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    Widget chip(String label, SearchSourceFilter filter, {Color? dot, IconData? icon}) {
+      final isSelected = selected == filter;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (dot != null) ...[
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 6),
+              ] else if (icon != null) ...[
+                Icon(icon,
+                    size: 14,
+                    color: isSelected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+              ],
+              Text(label),
+            ],
+          ),
+          selected: isSelected,
+          showCheckmark: false,
+          onSelected: (_) =>
+              ref.read(onlineSearchStateProvider.notifier).setSourceFilter(filter),
+          labelStyle: textTheme.labelLarge?.copyWith(
+            color: isSelected ? scheme.onPrimaryContainer : scheme.onSurface,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          ),
+          backgroundColor: scheme.surfaceContainerHigh,
+          selectedColor: scheme.primaryContainer,
+          side: BorderSide.none,
+          shape: const StadiumBorder(),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          chip('Tout', SearchSourceFilter.all),
+          chip('Deezer', SearchSourceFilter.deezer, dot: const Color(0xFFB266FF)),
+          chip('YouTube', SearchSourceFilter.youtube, dot: const Color(0xFFFF5A5A)),
+          chip('SoundCloud', SearchSourceFilter.soundcloud, dot: const Color(0xFFFF9142)),
+          chip('Local', SearchSourceFilter.local, icon: Icons.folder_rounded),
+        ],
+      ),
+    );
+  }
+}
+
 // ——— Section ———
 
 class _SectionTitle extends StatelessWidget {
@@ -874,70 +1024,127 @@ class _AlbumPlaceholder extends StatelessWidget {
 
 // ——— Morceau ———
 
-class _TrackCard extends StatelessWidget {
+class _TrackCard extends ConsumerWidget {
   const _TrackCard({
     required this.track,
     required this.isDownloading,
     required this.progress,
     required this.onDownload,
+    required this.onStream,
   });
 
   final DeezerSearchResult track;
   final bool isDownloading;
   final double? progress;
   final VoidCallback onDownload;
+  final VoidCallback onStream;
+
+  String get _badgeLabel => switch (track.source) {
+        ResultSource.deezer => 'DZ',
+        ResultSource.youtube => 'YT',
+        ResultSource.soundcloud => 'SC',
+      };
+
+  Color get _badgeColor => switch (track.source) {
+        ResultSource.deezer => const Color(0xFFB266FF),
+        ResultSource.youtube => const Color(0xFFFF5A5A),
+        ResultSource.soundcloud => const Color(0xFFFF9142),
+      };
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final p = progress?.clamp(0.0, 1.0);
 
+    final playerState = ref.watch(audioPlayerProvider);
+    final streamId = 'stream_${track.source.name}_${track.id}';
+    final isActive = playerState.currentSong?.id == streamId;
+    final isPlayingThis = isActive && playerState.isPlaying;
+
     return Material(
-      color: scheme.surfaceContainerLow,
+      color: isActive
+          ? scheme.primaryContainer.withValues(alpha: 0.08)
+          : scheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: isDownloading ? null : onDownload,
+        onTap: isDownloading ? null : onStream,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
           child: Row(
             children: [
               Container(
-                width: 54,
-                height: 54,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: track.imgUrl != null && track.imgUrl!.isNotEmpty
-                    ? Image.network(
-                        track.imgUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _TrackThumbFallback(scheme: scheme),
-                      )
-                    : _TrackThumbFallback(scheme: scheme),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    track.imgUrl != null && track.imgUrl!.isNotEmpty
+                        ? Image.network(
+                            track.imgUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _TrackThumbFallback(scheme: scheme),
+                          )
+                        : _TrackThumbFallback(scheme: scheme),
+                    if (isActive)
+                      ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        child: Icon(Icons.equalizer_rounded,
+                            color: scheme.primary, size: 20),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      track.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            track.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: isActive ? scheme.primary : scheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: _badgeColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _badgeLabel,
+                            style: TextStyle(
+                              color: _badgeColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       track.artist,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
+                      style: textTheme.labelSmall?.copyWith(
                         color: scheme.onSurfaceVariant,
-                        fontSize: 13,
                       ),
                     ),
                     if (isDownloading) ...[
@@ -958,14 +1165,25 @@ class _TrackCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (!isDownloading)
-                IconButton.filledTonal(
+              if (!isDownloading) ...[
+                IconButton(
+                  tooltip: 'Télécharger',
                   onPressed: onDownload,
-                  icon: const Icon(Icons.download_rounded, size: 22),
-                  style: IconButton.styleFrom(
-                    backgroundColor: scheme.primaryContainer.withValues(alpha: 0.65),
+                  icon: Icon(Icons.download_rounded,
+                      color: scheme.onSurfaceVariant, size: 22),
+                ),
+                IconButton(
+                  tooltip: isPlayingThis ? 'Pause' : 'Écouter',
+                  onPressed: onStream,
+                  icon: Icon(
+                    isPlayingThis
+                        ? Icons.pause_circle_rounded
+                        : Icons.play_circle_rounded,
+                    color: isActive ? scheme.primary : scheme.onSurface,
+                    size: 30,
                   ),
                 ),
+              ],
             ],
           ),
         ),

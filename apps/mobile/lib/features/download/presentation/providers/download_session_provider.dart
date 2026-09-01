@@ -70,6 +70,11 @@ class DownloadHistoryEntry {
     this.trackCount,
     /// Pour une piste : id album Deezer si connu (re-téléchargement / regroupement).
     this.trackDeezerAlbumId,
+    /// Type d'origine réel ('track' Deezer, 'youtube', 'soundcloud') — les
+    /// albums sont toujours Deezer donc n'ont pas besoin de ce champ.
+    this.sourceIdType = 'track',
+    /// URL d'origine (requise pour retélécharger une piste SoundCloud).
+    this.sourceUrl,
   });
 
   final String id;
@@ -83,6 +88,8 @@ class DownloadHistoryEntry {
   final String? errorMessage;
   final int? trackCount;
   final String? trackDeezerAlbumId;
+  final String sourceIdType;
+  final String? sourceUrl;
 
   DeezerSearchResult toDeezerItem() {
     if (isAlbum) {
@@ -96,10 +103,11 @@ class DownloadHistoryEntry {
     }
     return DeezerSearchResult(
       id: deezerItemId,
-      idType: 'track',
+      idType: sourceIdType,
       title: title,
       artist: subtitle,
       deezerAlbumId: trackDeezerAlbumId,
+      sourceUrl: sourceUrl,
     );
   }
 }
@@ -347,6 +355,8 @@ class DownloadSessionNotifier extends StateNotifier<DownloadSessionState> {
                 trackCount: result.trackCount,
                 trackDeezerAlbumId:
                     task.item.isAlbum ? null : task.item.deezerAlbumId,
+                sourceIdType: task.item.idType,
+                sourceUrl: task.item.sourceUrl,
               ),
             );
             state = state.copyWith(
@@ -370,6 +380,8 @@ class DownloadSessionNotifier extends StateNotifier<DownloadSessionState> {
                 errorMessage: result.error ?? 'Échec',
                 trackDeezerAlbumId:
                     task.item.isAlbum ? null : task.item.deezerAlbumId,
+                sourceIdType: task.item.idType,
+                sourceUrl: task.item.sourceUrl,
               ),
             );
             state = state.copyWith(
@@ -399,6 +411,8 @@ class DownloadSessionNotifier extends StateNotifier<DownloadSessionState> {
                   at: DateTime.now(),
                   trackDeezerAlbumId:
                       task.item.isAlbum ? null : task.item.deezerAlbumId,
+                  sourceIdType: task.item.idType,
+                  sourceUrl: task.item.sourceUrl,
                 ),
               );
             }

@@ -42,7 +42,7 @@ class PlaylistCard extends StatelessWidget {
                           .colorScheme
                           .primary
                           .withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                   ),
                 ),
@@ -56,7 +56,7 @@ class PlaylistCard extends StatelessWidget {
                           .colorScheme
                           .primary
                           .withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                   ),
                 ),
@@ -64,7 +64,7 @@ class PlaylistCard extends StatelessWidget {
                 Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.2),
@@ -78,7 +78,7 @@ class PlaylistCard extends StatelessWidget {
                   child: Stack(
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(18),
                         child: _buildMosaic(context),
                       ),
                       // Overlay dégradé
@@ -90,7 +90,7 @@ class PlaylistCard extends StatelessWidget {
                           height: 60,
                           decoration: BoxDecoration(
                             borderRadius: const BorderRadius.vertical(
-                                bottom: Radius.circular(12)),
+                                bottom: Radius.circular(18)),
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
@@ -113,7 +113,7 @@ class PlaylistCard extends StatelessWidget {
                               width: 32,
                               height: 32,
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary,
+                                color: Theme.of(context).colorScheme.primaryContainer,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
@@ -123,9 +123,9 @@ class PlaylistCard extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.play_arrow_rounded,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
                                 size: 20,
                               ),
                             ),
@@ -148,22 +148,15 @@ class PlaylistCard extends StatelessWidget {
                   playlist.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   details,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.6),
-                        fontSize: 11,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
               ],
