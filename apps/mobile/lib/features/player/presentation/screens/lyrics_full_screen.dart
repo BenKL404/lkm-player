@@ -28,8 +28,13 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
       // Redimensionnée avant extraction : décoder la pochette en pleine
       // résolution juste pour en tirer une couleur dominante est ce qui
       // saccadait (« ramait ») l'entrée sur cette page à chaque ouverture.
-      final imageProvider =
-          ResizeImage(FileImage(File(albumArtPath)), width: 80, height: 80);
+      // Pochette distante (piste en streaming, pas encore téléchargée) :
+      // même traitement que pour un fichier local.
+      final isRemote = albumArtPath.startsWith('http://') ||
+          albumArtPath.startsWith('https://');
+      final imageProvider = isRemote
+          ? ResizeImage(NetworkImage(albumArtPath), width: 80, height: 80)
+          : ResizeImage(FileImage(File(albumArtPath)), width: 80, height: 80);
       final palette = await PaletteGenerator.fromImageProvider(
         imageProvider,
         maximumColorCount: 10,
@@ -174,7 +179,13 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
         ),
         child: () {
           final path = albumArtPath;
-          if (path == null || path.isEmpty || !File(path).existsSync()) {
+          final isRemote = path != null &&
+              (path.startsWith('http://') || path.startsWith('https://'));
+          final hasLocalFile = path != null &&
+              path.isNotEmpty &&
+              !isRemote &&
+              File(path).existsSync();
+          if (path == null || path.isEmpty || !(isRemote || hasLocalFile)) {
             return const SizedBox.expand();
           }
           // Décoder à la taille de l'écran plutôt qu'en pleine résolution
@@ -183,17 +194,29 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
           final dpr = MediaQuery.devicePixelRatioOf(context);
           final cacheW = (size.width * dpr).round();
           final cacheH = (size.height * dpr).round();
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              Positioned.fill(
-                child: Image.file(
+          // Pochette distante (piste en streaming) : même rendu que pour un
+          // fichier local, juste une source réseau au lieu d'un fichier.
+          final coverImage = isRemote
+              ? Image.network(
+                  path,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                  cacheWidth: cacheW,
+                  cacheHeight: cacheH,
+                  errorBuilder: (_, __, ___) => const SizedBox.expand(),
+                )
+              : Image.file(
                   File(path),
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
                   cacheWidth: cacheW,
                   cacheHeight: cacheH,
-                ),
+                );
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: coverImage,
               ),
               // Gradient Blur Overlay (Full Background)
               Positioned.fill(

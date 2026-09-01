@@ -659,7 +659,15 @@ def deezer_search(search, search_type):
             i["id_type"] = TYPE_ALBUM
             i["album"] = item["title"]
             i["album_id"] = item["id"]
-            i["img_url"] = item["cover_small"]
+            # cover_small ne fait que 56x56 : nettement plus flou que la
+            # pochette 1200x1200 embarquée au téléchargement. On prend la
+            # plus grande variante disponible, avec repli si absente.
+            i["img_url"] = (
+                item.get("cover_xl")
+                or item.get("cover_big")
+                or item.get("cover_medium")
+                or item.get("cover_small")
+            )
             i["artist"] = item["artist"]["name"]
             i["title"] = ""
             i["preview_url"] = ""
@@ -668,7 +676,13 @@ def deezer_search(search, search_type):
             i["id"] = str(item["id"])
             i["id_type"] = TYPE_TRACK
             i["title"] = item["title"]
-            i["img_url"] = item["album"]["cover_small"]
+            album = item["album"]
+            i["img_url"] = (
+                album.get("cover_xl")
+                or album.get("cover_big")
+                or album.get("cover_medium")
+                or album.get("cover_small")
+            )
             i["album"] = item["album"]["title"]
             i["album_id"] = item["album"]["id"]
             i["artist"] = item["artist"]["name"]

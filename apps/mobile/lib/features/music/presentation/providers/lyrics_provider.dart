@@ -18,11 +18,17 @@ final lyricsProvider = FutureProvider.family<String?, String>((ref, songId) asyn
     if (list.isNotEmpty) song = list.first;
   }
   if (song == null) {
-    final playerState = ref.watch(audioPlayerProvider);
-    if (playerState.currentSong?.id == songId) {
-      song = playerState.currentSong;
-    } else if (playerState.queue.isNotEmpty) {
-      final inQueue = playerState.queue.where((s) => s.id == songId).toList();
+    // Ne regarder que la piste courante et la file, pas tout
+    // `audioPlayerProvider` : celui-ci change à chaque tick de position
+    // pendant la lecture, ce qui relançait cette recherche de paroles en
+    // boucle et faisait clignoter le loader alors que le texte était déjà là.
+    final currentSong =
+        ref.watch(audioPlayerProvider.select((s) => s.currentSong));
+    final queue = ref.watch(audioPlayerProvider.select((s) => s.queue));
+    if (currentSong?.id == songId) {
+      song = currentSong;
+    } else if (queue.isNotEmpty) {
+      final inQueue = queue.where((s) => s.id == songId).toList();
       if (inQueue.isNotEmpty) song = inQueue.first;
     }
   }

@@ -408,9 +408,13 @@ def album_tracks(
     album_title = meta.get("title", "")
     album_artist = meta.get("artist", "Unknown Artist")
     album_cover = meta.get("api_json", {})
+    # Plus grande variante d'abord (cover_small = 56x56, trop flou comparé à
+    # la pochette embarquée au téléchargement).
     cover_url = (
-        album_cover.get("cover_small")
+        album_cover.get("cover_xl")
+        or album_cover.get("cover_big")
         or album_cover.get("cover_medium")
+        or album_cover.get("cover_small")
         or ""
     )
     tracks_raw = meta.get("tracks_api_data", [])
