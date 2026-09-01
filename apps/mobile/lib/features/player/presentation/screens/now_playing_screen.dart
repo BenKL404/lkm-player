@@ -698,7 +698,7 @@ class _BottomActionsPill extends ConsumerWidget {
         IconButton(
           onPressed: () => context.push(AppRouter.lyrics),
           iconSize: iconSize,
-          icon: Icon(Icons.lyrics_rounded, color: muted),
+          icon: Icon(Icons.subtitles_rounded, color: muted),
           tooltip: 'Paroles',
         ),
         IconButton(
@@ -897,7 +897,7 @@ void _showOptionsMenu(
                       padding: const EdgeInsets.only(bottom: 20, top: 8),
                       children: [
                         _OptionTile(
-                          icon: Icons.lyrics_outlined,
+                          icon: Icons.subtitles_rounded,
                           label: 'Paroles',
                           onTap: () {
                             Navigator.pop(context);

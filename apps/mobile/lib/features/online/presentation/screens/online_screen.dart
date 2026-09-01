@@ -61,7 +61,8 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
               )
             : Consumer(
                 builder: (context, ref, _) {
-                  final n = ref.watch(downloadSessionProvider).activeTasks.length;
+                  final n =
+                      ref.watch(downloadSessionProvider).activeTasks.length;
                   final label = n > 99 ? '99+' : '$n';
                   return IconButton(
                     tooltip: 'Téléchargements${n > 0 ? ' ($n)' : ''}',
@@ -70,11 +71,16 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                       isLabelVisible: n > 0,
                       label: Text(
                         label,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, height: 1),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            height: 1),
                       ),
                       padding: n > 9
-                          ? const EdgeInsets.symmetric(horizontal: 5, vertical: 2)
-                          : const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          ? const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 2)
+                          : const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                       child: const Icon(Icons.downloading_rounded),
                     ),
                   );
@@ -126,7 +132,9 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                   },
                   onSubmit: (value) {
                     if (value.trim().isNotEmpty) {
-                      ref.read(onlineSearchStateProvider.notifier).search(value.trim());
+                      ref
+                          .read(onlineSearchStateProvider.notifier)
+                          .search(value.trim());
                     }
                   },
                 ),
@@ -165,6 +173,13 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
       return _buildLocalResults(searchState);
     }
 
+    // Pas de connexion internet : la recherche en ligne a échoué et
+    // basculé automatiquement sur la bibliothèque locale, affichée tout de
+    // suite (avec un bandeau expliquant pourquoi) plutôt qu'un écran d'erreur.
+    if (searchState.isOfflineFallback) {
+      return _buildLocalResults(searchState, offline: true);
+    }
+
     if (apiClient == null || !apiClient.isConfigured) {
       return const _StatePage(
         icon: Icons.cloud_off_rounded,
@@ -196,33 +211,38 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
       final session = ref.watch(downloadSessionProvider);
       if (session.hasActiveWork) {
         return CustomScrollView(
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics()),
           slivers: [
             SliverFillRemaining(
               hasScrollBody: false,
-        child: Padding(
+              child: Padding(
                 padding: const EdgeInsets.fromLTRB(32, 0, 32, 120),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
                       Icons.downloading_rounded,
                       size: 56,
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.65),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.65),
                     ),
                     const SizedBox(height: 16),
-              Text(
+                    Text(
                       'Téléchargements en cours',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
                       'Ouvre la file pour mettre en pause, annuler ou voir l’historique.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                       textAlign: TextAlign.center,
                     ),
@@ -235,14 +255,15 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                     const SizedBox(height: 12),
                     Text(
                       'Ou lance une recherche pour ajouter d’autres titres.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
               ),
-            ],
-          ),
-        ),
             ),
           ],
         );
@@ -251,7 +272,8 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
         icon: Icons.explore_rounded,
         iconGradient: true,
         title: 'Trouve ta musique',
-        subtitle: 'Tape un titre, un artiste ou un album puis valide avec Entrée.',
+        subtitle:
+            'Tape un titre, un artiste ou un album puis valide avec Entrée.',
       );
     }
 
@@ -261,7 +283,8 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
     final albums = searchState.albumResults.where((r) => r.isAlbum).toList();
 
     return CustomScrollView(
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      physics:
+          const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       slivers: [
         if (albums.isNotEmpty) ...[
           SliverToBoxAdapter(
@@ -276,8 +299,8 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
               height: _albumStripHeight,
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              scrollDirection: Axis.horizontal,
-              itemCount: albums.length,
+                scrollDirection: Axis.horizontal,
+                itemCount: albums.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 14),
                 itemBuilder: (context, index) {
                   final album = albums[index];
@@ -287,7 +310,8 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                     artSize: _albumArt,
                     isDownloading: isDl,
                     progress: isDl ? downloadProgress : null,
-                    onOpenDetails: () => _openAlbumTracksSheet(context, ref, apiClient, album),
+                    onOpenDetails: () =>
+                        _openAlbumTracksSheet(context, ref, apiClient, album),
                   );
                 },
               ),
@@ -328,21 +352,30 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
     );
   }
 
-  /// Résultats du filtre "Local" : morceaux déjà dans la bibliothèque de
-  /// l'appareil, réutilise [SongTile] (lecture, favoris, menu… déjà en place).
-  Widget _buildLocalResults(OnlineSearchState searchState) {
+  /// Résultats du filtre "Local", ou repli automatique hors-ligne ([offline])
+  /// : morceaux déjà dans la bibliothèque de l'appareil, réutilise
+  /// [SongTile] (lecture, favoris, menu… déjà en place).
+  Widget _buildLocalResults(OnlineSearchState searchState,
+      {bool offline = false}) {
     final songs = searchState.localResults;
     if (songs.isEmpty) {
-      return const _StatePage(
-        icon: Icons.folder_rounded,
+      return _StatePage(
+        icon: offline ? Icons.wifi_off_rounded : Icons.folder_rounded,
         iconGradient: true,
-        title: 'Bibliothèque locale',
-        subtitle: 'Tape un titre, un artiste ou un album de ta bibliothèque puis valide avec Entrée.',
+        title: offline ? 'Pas de connexion internet' : 'Bibliothèque locale',
+        subtitle: offline
+            ? 'Aucun résultat dans ta bibliothèque pour cette recherche. Reconnecte-toi pour chercher en ligne.'
+            : 'Tape un titre, un artiste ou un album de ta bibliothèque puis valide avec Entrée.',
       );
     }
     return CustomScrollView(
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      physics:
+          const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       slivers: [
+        if (offline)
+          const SliverToBoxAdapter(
+            child: _OfflineBanner(),
+          ),
         SliverToBoxAdapter(
           child: _SectionTitle(
             label: 'Bibliothèque locale',
@@ -365,11 +398,13 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
     );
   }
 
-  Future<void> _downloadTrack(BuildContext context, DeezerSearchResult track) async {
+  Future<void> _downloadTrack(
+      BuildContext context, DeezerSearchResult track) async {
     await ref.read(downloadSessionProvider.notifier).enqueue(track);
   }
 
-  Future<void> _streamTrack(BuildContext context, DeezerSearchResult track) async {
+  Future<void> _streamTrack(
+      BuildContext context, DeezerSearchResult track) async {
     try {
       await playStream(ref, track);
     } catch (e) {
@@ -380,7 +415,8 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
     }
   }
 
-  Future<void> _downloadAlbum(BuildContext context, DeezerSearchResult album) async {
+  Future<void> _downloadAlbum(
+      BuildContext context, DeezerSearchResult album) async {
     await ref.read(downloadSessionProvider.notifier).enqueue(album);
   }
 
@@ -408,7 +444,8 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
             return DecoratedBox(
               decoration: BoxDecoration(
                 color: scheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -420,29 +457,31 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
+                          child: SizedBox(
                             width: 76,
                             height: 76,
-                            child: album.imgUrl != null && album.imgUrl!.isNotEmpty
-                                ? Image.network(
-                                    album.imgUrl!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        _AlbumPlaceholder(scheme: scheme),
-                                  )
-                                : _AlbumPlaceholder(scheme: scheme),
+                            child:
+                                album.imgUrl != null && album.imgUrl!.isNotEmpty
+                                    ? Image.network(
+                                        album.imgUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            _AlbumPlaceholder(scheme: scheme),
+                                      )
+                                    : _AlbumPlaceholder(scheme: scheme),
                           ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
                                 album.displayTitle,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                                style: textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w800),
                               ),
                               const SizedBox(height: 4),
                               Text(
@@ -459,7 +498,9 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                                   Navigator.of(sheetContext).pop();
                                   _downloadAlbum(context, album);
                                 },
-                                icon: const Icon(Icons.download_for_offline_rounded, size: 25),
+                                icon: const Icon(
+                                    Icons.download_for_offline_rounded,
+                                    size: 25),
                                 label: const Text('Télécharger l’album'),
                               ),
                             ],
@@ -468,7 +509,9 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                       ],
                     ),
                   ),
-                  Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.35)),
+                  Divider(
+                      height: 1,
+                      color: scheme.outlineVariant.withValues(alpha: 0.35)),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
                     child: Text(
@@ -484,7 +527,8 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                     child: FutureBuilder<List<DeezerSearchResult>>(
                       future: tracksFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return const Center(
                             child: Padding(
                               padding: EdgeInsets.all(28),
@@ -499,7 +543,8 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                               child: Text(
                                 '${snapshot.error}',
                                 textAlign: TextAlign.center,
-                                style: textTheme.bodyMedium?.copyWith(color: scheme.error),
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(color: scheme.error),
                               ),
                             ),
                           );
@@ -517,8 +562,10 @@ class _OnlineScreenState extends ConsumerState<OnlineScreen> {
                         }
                         return Consumer(
                           builder: (context, ref, _) {
-                            final downloadingTrackId = ref.watch(downloadingTrackIdProvider);
-                            final dlProgress = ref.watch(downloadProgressProvider);
+                            final downloadingTrackId =
+                                ref.watch(downloadingTrackIdProvider);
+                            final dlProgress =
+                                ref.watch(downloadProgressProvider);
                             return ListView.builder(
                               controller: scrollController,
                               padding: const EdgeInsets.fromLTRB(8, 0, 8, 28),
@@ -597,7 +644,8 @@ class _AlbumTrackSheetRow extends StatelessWidget {
                         ? Image.network(
                             track.imgUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _TrackThumbMini(scheme: scheme),
+                            errorBuilder: (_, __, ___) =>
+                                _TrackThumbMini(scheme: scheme),
                           )
                         : _TrackThumbMini(scheme: scheme),
                   ),
@@ -611,7 +659,8 @@ class _AlbumTrackSheetRow extends StatelessWidget {
                         track.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                        style: textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       Text(
                         track.artist,
@@ -641,7 +690,8 @@ class _AlbumTrackSheetRow extends StatelessWidget {
                     onPressed: onDownload,
                     icon: const Icon(Icons.download_rounded, size: 20),
                     style: IconButton.styleFrom(
-                      backgroundColor: scheme.primaryContainer.withValues(alpha: 0.65),
+                      backgroundColor:
+                          scheme.primaryContainer.withValues(alpha: 0.65),
                     ),
                   )
                 else
@@ -682,7 +732,8 @@ class _TrackThumbMini extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: scheme.surfaceContainerHighest,
-      child: Icon(Icons.music_note_rounded, color: scheme.onSurfaceVariant.withValues(alpha: 0.5)),
+      child: Icon(Icons.music_note_rounded,
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.5)),
     );
   }
 }
@@ -717,24 +768,29 @@ class _SearchBar extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: 'Artiste, morceau ou album…',
-            hintStyle: TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.65)),
-            prefixIcon: Icon(Icons.search_rounded, color: scheme.primary, size: 26),
+            hintStyle: TextStyle(
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.65)),
+            prefixIcon:
+                Icon(Icons.search_rounded, color: scheme.primary, size: 26),
             suffixIcon: value.text.isNotEmpty
                 ? IconButton(
-                    icon: Icon(Icons.close_rounded, color: scheme.onSurfaceVariant),
+                    icon: Icon(Icons.close_rounded,
+                        color: scheme.onSurfaceVariant),
                     onPressed: onClear,
                   )
                 : null,
             filled: true,
             fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.65),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.35)),
+              borderSide: BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: 0.35)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
@@ -760,7 +816,8 @@ class _SourceFilterChips extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    Widget chip(String label, SearchSourceFilter filter, {Color? dot, IconData? icon}) {
+    Widget chip(String label, SearchSourceFilter filter,
+        {Color? dot, IconData? icon}) {
       final isSelected = selected == filter;
       return Padding(
         padding: const EdgeInsets.only(right: 8),
@@ -778,7 +835,9 @@ class _SourceFilterChips extends ConsumerWidget {
               ] else if (icon != null) ...[
                 Icon(icon,
                     size: 14,
-                    color: isSelected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant),
+                    color: isSelected
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurfaceVariant),
                 const SizedBox(width: 6),
               ],
               Text(label),
@@ -786,8 +845,9 @@ class _SourceFilterChips extends ConsumerWidget {
           ),
           selected: isSelected,
           showCheckmark: false,
-          onSelected: (_) =>
-              ref.read(onlineSearchStateProvider.notifier).setSourceFilter(filter),
+          onSelected: (_) => ref
+              .read(onlineSearchStateProvider.notifier)
+              .setSourceFilter(filter),
           labelStyle: textTheme.labelLarge?.copyWith(
             color: isSelected ? scheme.onPrimaryContainer : scheme.onSurface,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -806,10 +866,47 @@ class _SourceFilterChips extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         children: [
           chip('Tout', SearchSourceFilter.all),
-          chip('Deezer', SearchSourceFilter.deezer, dot: const Color(0xFFB266FF)),
-          chip('YouTube', SearchSourceFilter.youtube, dot: const Color(0xFFFF5A5A)),
-          chip('SoundCloud', SearchSourceFilter.soundcloud, dot: const Color(0xFFFF9142)),
+          chip('Deezer', SearchSourceFilter.deezer,
+              dot: const Color(0xFFB266FF)),
+          chip('YouTube', SearchSourceFilter.youtube,
+              dot: const Color(0xFFFF5A5A)),
+          chip('SoundCloud', SearchSourceFilter.soundcloud,
+              dot: const Color(0xFFFF9142)),
           chip('Local', SearchSourceFilter.local, icon: Icons.folder_rounded),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bandeau affiché quand la recherche en ligne a échoué faute de réseau et
+/// qu'on est basculé automatiquement sur la bibliothèque locale.
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.wifi_off_rounded,
+              size: 20, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Pas de connexion internet : résultats de ta bibliothèque locale.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
         ],
       ),
     );
@@ -859,7 +956,8 @@ class _SectionTitle extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+              border: Border.all(
+                  color: scheme.outlineVariant.withValues(alpha: 0.5)),
             ),
             child: Text(
               '$count',
@@ -921,13 +1019,15 @@ class _AlbumCard extends StatelessWidget {
                         padding: const EdgeInsets.all(4),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(18),
-                          child: album.imgUrl != null && album.imgUrl!.isNotEmpty
-                              ? Image.network(
-                                  album.imgUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => _AlbumPlaceholder(scheme: scheme),
-                                )
-                              : _AlbumPlaceholder(scheme: scheme),
+                          child:
+                              album.imgUrl != null && album.imgUrl!.isNotEmpty
+                                  ? Image.network(
+                                      album.imgUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          _AlbumPlaceholder(scheme: scheme),
+                                    )
+                                  : _AlbumPlaceholder(scheme: scheme),
                         ),
                       ),
                     ),
@@ -941,7 +1041,9 @@ class _AlbumCard extends StatelessWidget {
                               color: Colors.black.withValues(alpha: 0.45),
                               child: Center(
                                 child: Text(
-                                  p != null && p > 0 ? '${(p * 100).round()}%' : '…',
+                                  p != null && p > 0
+                                      ? '${(p * 100).round()}%'
+                                      : '…',
                                   style: textTheme.titleMedium?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w800,
@@ -957,7 +1059,8 @@ class _AlbumCard extends StatelessWidget {
                         left: 12,
                         right: 12,
                         bottom: 14,
-                        child: _LinearDownloadBar(progress: p, brightTrack: true),
+                        child:
+                            _LinearDownloadBar(progress: p, brightTrack: true),
                       ),
                     if (!isDownloading)
                       Positioned(
@@ -973,35 +1076,37 @@ class _AlbumCard extends StatelessWidget {
                             onTap: onOpenDetails,
                             child: const Padding(
                               padding: EdgeInsets.all(10),
-                              child: Icon(Icons.queue_music_rounded, color: Colors.white, size: 20),
+                              child: Icon(Icons.queue_music_rounded,
+                                  color: Colors.white, size: 20),
                             ),
                           ),
                         ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
               ),
             ),
           ),
           const SizedBox(height: 10),
-            Text(
-              album.displayTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 13),
-              ),
+          Text(
+            album.displayTitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
           const SizedBox(height: 2),
-            Text(
-              album.artist,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          Text(
+            album.artist,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
               fontSize: 12,
             ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1016,7 +1121,8 @@ class _AlbumPlaceholder extends StatelessWidget {
     return ColoredBox(
       color: scheme.surfaceContainerHighest,
       child: Center(
-        child: Icon(Icons.album_rounded, size: 44, color: scheme.onSurfaceVariant.withValues(alpha: 0.45)),
+        child: Icon(Icons.album_rounded,
+            size: 44, color: scheme.onSurfaceVariant.withValues(alpha: 0.45)),
       ),
     );
   }
@@ -1079,7 +1185,8 @@ class _TrackCard extends ConsumerWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
+                  border: Border.all(
+                      color: scheme.outlineVariant.withValues(alpha: 0.4)),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
@@ -1089,7 +1196,8 @@ class _TrackCard extends ConsumerWidget {
                         ? Image.network(
                             track.imgUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _TrackThumbFallback(scheme: scheme),
+                            errorBuilder: (_, __, ___) =>
+                                _TrackThumbFallback(scheme: scheme),
                           )
                         : _TrackThumbFallback(scheme: scheme),
                     if (isActive)
@@ -1115,13 +1223,15 @@ class _TrackCard extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                             style: textTheme.bodyLarge?.copyWith(
                               fontWeight: FontWeight.w500,
-                              color: isActive ? scheme.primary : scheme.onSurface,
+                              color:
+                                  isActive ? scheme.primary : scheme.onSurface,
                             ),
                           ),
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
                           decoration: BoxDecoration(
                             color: _badgeColor.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
@@ -1201,7 +1311,8 @@ class _TrackThumbFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: scheme.surfaceContainerHighest,
-      child: Icon(Icons.music_note_rounded, color: scheme.onSurfaceVariant.withValues(alpha: 0.5)),
+      child: Icon(Icons.music_note_rounded,
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.5)),
     );
   }
 }
@@ -1226,7 +1337,8 @@ class _LinearDownloadBar extends StatelessWidget {
       child: SizedBox(
         height: 5,
         child: p == null || p <= 0
-            ? LinearProgressIndicator(minHeight: 5, backgroundColor: bg, color: fg)
+            ? LinearProgressIndicator(
+                minHeight: 5, backgroundColor: bg, color: fg)
             : LinearProgressIndicator(
                 value: p,
                 minHeight: 5,
@@ -1310,6 +1422,7 @@ class _StatePage extends StatelessWidget {
         );
 
   final IconData? icon;
+
   /// Si non null, remplace l’affichage basé sur [icon] (ex. icône animée).
   final Widget? leading;
   final String title;
@@ -1351,12 +1464,15 @@ class _StatePage extends StatelessWidget {
               Icon(
                 icon!,
                 size: 56,
-                color: isError ? scheme.error : scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                color: isError
+                    ? scheme.error
+                    : scheme.onSurfaceVariant.withValues(alpha: 0.75),
               ),
             const SizedBox(height: 24),
             Text(
               title,
-              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              style:
+                  textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),

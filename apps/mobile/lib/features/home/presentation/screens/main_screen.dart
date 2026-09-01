@@ -45,15 +45,21 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
-  /// Depuis un tap sur la barre de navigation : glisse jusqu'à l'onglet visé
-  /// (vers la gauche si plus loin dans la liste, vers la droite si avant).
+  /// Depuis un tap sur la barre de navigation. Onglet voisin (ex. Accueil ->
+  /// Découvrir) : glissement animé, identique au swipe. Onglet non voisin
+  /// (ex. Accueil -> Réglages) : saut direct sans animation — on ne veut pas
+  /// traverser visuellement les onglets intermédiaires, comme WhatsApp.
   void _onTap(int index) {
     if (index == _tabIndex) return;
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeInOutCubic,
-    );
+    if ((index - _tabIndex).abs() <= 1) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOutCubic,
+      );
+    } else {
+      _pageController.jumpToPage(index);
+    }
   }
 
   void _onPageChanged(int index) {

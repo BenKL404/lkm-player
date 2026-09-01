@@ -23,12 +23,14 @@ final downloadApiClientProvider = Provider<TelegramusicApiClient?>((ref) {
 
 /// Chemin du dossier où sont enregistrées les pistes téléchargées (Téléchargements/Musio).
 Future<String> getDownloadDirectoryPath() async {
-  final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+  final dir =
+      await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
   return path.join(dir.path, 'Musio');
 }
 
 /// Provider exposant le chemin du dossier de téléchargement (pour l’affichage dans Paramètres).
-final downloadDirectoryPathProvider = FutureProvider<String>((ref) => getDownloadDirectoryPath());
+final downloadDirectoryPathProvider =
+    FutureProvider<String>((ref) => getDownloadDirectoryPath());
 
 /// Source à filtrer dans les résultats affichés (l'API interroge toujours
 /// tout le monde ; le filtre ne fait que changer ce qui est montré/relancé).
@@ -44,17 +46,25 @@ class OnlineSearchState {
     this.localResults = const [],
     this.sourceFilter = SearchSourceFilter.all,
     this.isLoading = false,
+    this.isOfflineFallback = false,
     this.error,
   });
 
   /// Pistes toutes sources confondues (Deezer + YouTube + SoundCloud).
   final List<DeezerSearchResult> results;
   final List<DeezerSearchResult> albumResults;
-  /// Résultats pour le filtre `local` : morceaux déjà présents dans la
-  /// bibliothèque de l'appareil (indépendant de l'API en ligne).
+
+  /// Résultats pour le filtre `local`, ou pour le repli hors-ligne
+  /// automatique ci-dessous : morceaux déjà présents dans la bibliothèque
+  /// de l'appareil (indépendant de l'API en ligne).
   final List<SongModel> localResults;
   final SearchSourceFilter sourceFilter;
   final bool isLoading;
+
+  /// true quand la recherche en ligne a échoué faute de réseau (pas quand
+  /// l'utilisateur a choisi le filtre "Local" lui-même) : [localResults]
+  /// contient alors un repli automatique sur la bibliothèque locale.
+  final bool isOfflineFallback;
   final String? error;
 
   OnlineSearchState copyWith({
@@ -63,6 +73,7 @@ class OnlineSearchState {
     List<SongModel>? localResults,
     SearchSourceFilter? sourceFilter,
     bool? isLoading,
+    bool? isOfflineFallback,
     String? error,
   }) {
     return OnlineSearchState(
@@ -71,6 +82,7 @@ class OnlineSearchState {
       localResults: localResults ?? this.localResults,
       sourceFilter: sourceFilter ?? this.sourceFilter,
       isLoading: isLoading ?? this.isLoading,
+      isOfflineFallback: isOfflineFallback ?? false,
       error: error,
     );
   }
@@ -97,6 +109,19 @@ class OnlineSearchNotifier extends StateNotifier<OnlineSearchState> {
     return normalized.isEmpty ? '' : '$normalized ';
   }
 
+  /// Filtre la bibliothèque locale (titre / artiste / album), utilisé pour le
+  /// filtre "Local" explicite ET pour le repli automatique hors-ligne.
+  List<SongModel> _searchLocal(String normalizedLower) {
+    final songs =
+        _ref.read(musicProvider).valueOrNull?.songs ?? const <SongModel>[];
+    return songs
+        .where((s) =>
+            s.title.toLowerCase().contains(normalizedLower) ||
+            s.artist.toLowerCase().contains(normalizedLower) ||
+            s.album.toLowerCase().contains(normalizedLower))
+        .toList();
+  }
+
   void setSourceFilter(SearchSourceFilter filter) {
     state = state.copyWith(sourceFilter: filter);
     if (_lastQuery.isNotEmpty) search(_lastQuery);
@@ -106,25 +131,18 @@ class OnlineSearchNotifier extends StateNotifier<OnlineSearchState> {
     final normalized = _normalizeQuery(query);
     _lastQuery = normalized;
     if (normalized.isEmpty) {
-      state = state.copyWith(results: [], albumResults: [], localResults: [], error: null);
+      state = state.copyWith(
+          results: [], albumResults: [], localResults: [], error: null);
       return;
     }
 
     // Filtre "Local" : ne touche pas le réseau, cherche dans la bibliothèque
     // déjà chargée en cache (titre / artiste / album).
     if (state.sourceFilter == SearchSourceFilter.local) {
-      final lower = normalized.toLowerCase();
-      final songs = _ref.read(musicProvider).valueOrNull?.songs ?? const <SongModel>[];
-      final matches = songs
-          .where((s) =>
-              s.title.toLowerCase().contains(lower) ||
-              s.artist.toLowerCase().contains(lower) ||
-              s.album.toLowerCase().contains(lower))
-          .toList();
       state = state.copyWith(
         results: [],
         albumResults: [],
-        localResults: matches,
+        localResults: _searchLocal(normalized.toLowerCase()),
         isLoading: false,
         error: null,
       );
@@ -153,11 +171,24 @@ class OnlineSearchNotifier extends StateNotifier<OnlineSearchState> {
     };
     state = state.copyWith(isLoading: true, error: null, localResults: []);
     try {
-      final unified = await client.unifiedSearch(queryForApi, provider: providerParam);
+      final unified =
+          await client.unifiedSearch(queryForApi, provider: providerParam);
       state = state.copyWith(
         results: unified.allTracks,
         albumResults: unified.deezerAlbums,
         isLoading: false,
+        error: null,
+      );
+    } on NetworkUnavailableException {
+      // Pas de connexion internet (ou serveur injoignable) : on ne bloque
+      // pas sur une erreur, on bascule silencieusement sur la bibliothèque
+      // locale, affichée immédiatement à la place des résultats en ligne.
+      state = state.copyWith(
+        results: [],
+        albumResults: [],
+        localResults: _searchLocal(normalized.toLowerCase()),
+        isLoading: false,
+        isOfflineFallback: true,
         error: null,
       );
     } catch (e) {
@@ -201,6 +232,7 @@ class DownloadResult {
   final SongModel? song;
   final String? filePath;
   final String? error;
+
   /// Nombre de pistes (pour un album).
   final int? trackCount;
 
@@ -239,6 +271,7 @@ Future<DownloadResult> downloadTrackAndAddToLibrary(
         onDownloadProgress?.call(p);
       }
     }
+
     final bytes = switch (track.source) {
       ResultSource.deezer => await client.downloadTrack(
           track.id,
@@ -278,7 +311,8 @@ Future<DownloadResult> downloadTrackAndAddToLibrary(
     final String targetDirPath;
 
     if (sa != null && st != null && sa.isNotEmpty && st.isNotEmpty) {
-      final albumFolderName = '${_sanitizeFileName(sa)} - ${_sanitizeFileName(st)}';
+      final albumFolderName =
+          '${_sanitizeFileName(sa)} - ${_sanitizeFileName(st)}';
       targetDirPath = path.join(downloadDir.path, albumFolderName);
       final albumDir = Directory(targetDirPath);
       if (!await albumDir.exists()) {
@@ -328,7 +362,8 @@ Future<DownloadResult> downloadTrackAndAddToLibrary(
         final appDir = await getApplicationDocumentsDirectory();
         final artDir = Directory(path.join(appDir.path, 'album_artworks'));
         if (!await artDir.exists()) await artDir.create(recursive: true);
-        final artPath = path.join(artDir.path, '${sourcePrefix}_${track.id}.jpg');
+        final artPath =
+            path.join(artDir.path, '${sourcePrefix}_${track.id}.jpg');
         await File(artPath).writeAsBytes(pictures.first.bytes);
         albumArtPath = artPath;
       }
@@ -341,9 +376,10 @@ Future<DownloadResult> downloadTrackAndAddToLibrary(
 
     final songId = '${sourcePrefix}_${track.id}';
     // Même clé d'album que le ZIP (id Deezer) pour regrouper les pistes téléchargées à la pièce.
-    final libraryAlbumId = (track.deezerAlbumId != null && track.deezerAlbumId!.isNotEmpty)
-        ? track.deezerAlbumId!
-        : '${sourcePrefix}_track_${track.id}';
+    final libraryAlbumId =
+        (track.deezerAlbumId != null && track.deezerAlbumId!.isNotEmpty)
+            ? track.deezerAlbumId!
+            : '${sourcePrefix}_track_${track.id}';
     final song = SongModel(
       id: songId,
       title: title,
@@ -413,7 +449,8 @@ Future<DownloadResult> downloadAlbumAndAddToLibrary(
 
     final archive = ZipDecoder().decodeBytes(bytes);
     final downloadDirPath = await getDownloadDirectoryPath();
-    final albumFolderName = '${_sanitizeFileName(album.artist)} - ${_sanitizeFileName(album.displayTitle)}';
+    final albumFolderName =
+        '${_sanitizeFileName(album.artist)} - ${_sanitizeFileName(album.displayTitle)}';
     final albumDirPath = path.join(downloadDirPath, albumFolderName);
     final albumDir = Directory(albumDirPath);
     if (!await albumDir.exists()) await albumDir.create(recursive: true);
@@ -452,7 +489,8 @@ Future<DownloadResult> downloadAlbumAndAddToLibrary(
         trackNumber = tag?.trackNumber;
         final pictures = tag?.pictures;
         if (pictures != null && pictures.isNotEmpty) {
-          final artPath = path.join(artDir.path, 'deezer_album_${album.id}_$index.jpg');
+          final artPath =
+              path.join(artDir.path, 'deezer_album_${album.id}_$index.jpg');
           await File(artPath).writeAsBytes(pictures.first.bytes);
           albumArtPath = artPath;
         }
@@ -496,7 +534,9 @@ Future<DownloadResult> downloadAlbumAndAddToLibrary(
 
 bool _isAudioFileName(String name) {
   final lower = name.toLowerCase();
-  return lower.endsWith('.mp3') || lower.endsWith('.flac') || lower.endsWith('.m4a');
+  return lower.endsWith('.mp3') ||
+      lower.endsWith('.flac') ||
+      lower.endsWith('.m4a');
 }
 
 String _sanitizeFileName(String s) {

@@ -7,6 +7,18 @@ import 'package:http/http.dart' as http;
 import 'download_cancel_token.dart';
 import 'models/deezer_search_result.dart';
 
+/// Levée quand le serveur est injoignable (pas de réseau, DNS, timeout) —
+/// distincte d'une erreur API classique (403, 500…) pour permettre à
+/// l'appelant de basculer automatiquement sur la recherche locale plutôt
+/// que d'afficher une erreur.
+class NetworkUnavailableException implements Exception {
+  const NetworkUnavailableException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// Résultats d'une recherche unifiée multi-sources.
 class UnifiedSearchResults {
   const UnifiedSearchResults({
@@ -68,16 +80,14 @@ class TelegramusicApiClient {
   }) async {
     if (!isConfigured) throw Exception('API non configurée');
     try {
-      final response = await http
-          .get(
-            _uri('/api/v1/search', {
-              'q': query,
-              'provider': provider,
-              'limit': '$limit',
-            }),
-            headers: {'Accept': 'application/json', ..._authHeaders},
-          )
-          .timeout(_timeout);
+      final response = await http.get(
+        _uri('/api/v1/search', {
+          'q': query,
+          'provider': provider,
+          'limit': '$limit',
+        }),
+        headers: {'Accept': 'application/json', ..._authHeaders},
+      ).timeout(_timeout);
       if (response.statusCode == 403) {
         throw Exception('Clé API invalide ou manquante');
       }
@@ -86,7 +96,8 @@ class TelegramusicApiClient {
       }
       final json = jsonDecode(response.body) as Map<String, dynamic>? ?? {};
       final deezer = json['deezer'] as Map<String, dynamic>?;
-      List<DeezerSearchResult> parse(dynamic raw) => (raw as List<dynamic>? ?? [])
+      List<DeezerSearchResult> parse(dynamic raw) => (raw as List<dynamic>? ??
+              [])
           .map((e) => DeezerSearchResult.fromJson(e as Map<String, dynamic>))
           .toList();
       return UnifiedSearchResults(
@@ -97,15 +108,18 @@ class TelegramusicApiClient {
       );
     } on SocketException {
       // Ne jamais inclure l'URL configurée dans un message affiché à l'écran.
-      throw Exception('Serveur injoignable. Vérifiez la configuration dans Paramètres et la connexion internet du téléphone.');
+      throw const NetworkUnavailableException(
+          'Serveur injoignable. Vérifiez la configuration dans Paramètres et la connexion internet du téléphone.');
     } on TimeoutException {
-      throw Exception('Délai dépassé. Le serveur ne répond pas.');
+      throw const NetworkUnavailableException(
+          'Délai dépassé. Le serveur ne répond pas.');
     }
   }
 
   /// Liste des résultats de recherche Deezer seuls (tracks ou albums) —
   /// conservé pour compat, utilise désormais la route v1.
-  Future<List<DeezerSearchResult>> searchResults(String query, {String type = 'track'}) async {
+  Future<List<DeezerSearchResult>> searchResults(String query,
+      {String type = 'track'}) async {
     final results = await unifiedSearch(query, provider: 'deezer');
     return type == 'album' ? results.deezerAlbums : results.deezerTracks;
   }
@@ -116,11 +130,15 @@ class TelegramusicApiClient {
   String streamUrl(DeezerSearchResult result, {String format = 'MP3_128'}) {
     switch (result.source) {
       case ResultSource.deezer:
-        return _uri('/api/v1/deezer/track/${result.id}/stream', {'format': format}).toString();
+        return _uri(
+                '/api/v1/deezer/track/${result.id}/stream', {'format': format})
+            .toString();
       case ResultSource.youtube:
         return _uri('/api/v1/youtube/${result.id}/stream').toString();
       case ResultSource.soundcloud:
-        return _uri('/api/v1/soundcloud/stream', {'url': result.sourceUrl ?? ''}).toString();
+        return _uri(
+                '/api/v1/soundcloud/stream', {'url': result.sourceUrl ?? ''})
+            .toString();
     }
   }
 
@@ -190,7 +208,8 @@ class TelegramusicApiClient {
       final chunks = <int>[];
       await for (final chunk in streamed.stream) {
         if (cancelToken?.isCancelled == true) {
-          throw DownloadCancelledException(cancelToken!.reason ?? DownloadCancelReason.cancel);
+          throw DownloadCancelledException(
+              cancelToken!.reason ?? DownloadCancelReason.cancel);
         }
         chunks.addAll(chunk);
         received += chunk.length;
@@ -203,7 +222,8 @@ class TelegramusicApiClient {
   }
 
   /// URL de la pochette Deezer (pour Image.network).
-  String trackCoverUrl(String trackId) => _uri('/api/v1/deezer/track/$trackId/cover').toString();
+  String trackCoverUrl(String trackId) =>
+      _uri('/api/v1/deezer/track/$trackId/cover').toString();
 
   /// GET /api/v1/deezer/album/{id}/download → bytes du ZIP.
   Future<List<int>> downloadAlbum(
@@ -221,18 +241,17 @@ class TelegramusicApiClient {
   }
 
   /// URL pochette album (pour affichage).
-  String albumCoverUrl(String albumId) => _uri('/api/v1/deezer/album/$albumId/cover').toString();
+  String albumCoverUrl(String albumId) =>
+      _uri('/api/v1/deezer/album/$albumId/cover').toString();
 
   /// GET /api/v1/deezer/album/{id}/tracks
   Future<List<DeezerSearchResult>> albumTracks(String albumId) async {
     if (!isConfigured) throw Exception('API non configurée');
     try {
-      final response = await http
-          .get(
-            _uri('/api/v1/deezer/album/$albumId/tracks'),
-            headers: {'Accept': 'application/json', ..._authHeaders},
-          )
-          .timeout(_timeout);
+      final response = await http.get(
+        _uri('/api/v1/deezer/album/$albumId/tracks'),
+        headers: {'Accept': 'application/json', ..._authHeaders},
+      ).timeout(_timeout);
       if (response.statusCode != 200) {
         throw Exception('Pistes album: ${response.statusCode}');
       }
@@ -242,9 +261,9 @@ class TelegramusicApiClient {
           .map((e) => DeezerSearchResult.fromJson(e as Map<String, dynamic>))
           .toList();
     } on SocketException {
-      throw Exception('Serveur injoignable.');
+      throw const NetworkUnavailableException('Serveur injoignable.');
     } on TimeoutException {
-      throw Exception('Délai dépassé.');
+      throw const NetworkUnavailableException('Délai dépassé.');
     }
   }
 }
