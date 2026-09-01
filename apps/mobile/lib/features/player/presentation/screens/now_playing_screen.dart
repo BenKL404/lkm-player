@@ -178,6 +178,19 @@ class _AlbumCoverCard extends StatelessWidget {
         borderRadius: BorderRadius.zero,
       );
     }
+    // Pochette distante (streaming/recherche en ligne, pas encore
+    // téléchargée) : décodée à la taille d'affichage, comme le fichier local.
+    if (path != null && (path.startsWith('http://') || path.startsWith('https://'))) {
+      return Image.network(
+        path,
+        width: width,
+        height: width,
+        fit: BoxFit.cover,
+        cacheWidth: cachePx,
+        cacheHeight: cachePx,
+        errorBuilder: (_, __, ___) => _placeholder(scheme),
+      );
+    }
     if (path != null && File(path).existsSync()) {
       return Image.file(
         File(path),
@@ -301,10 +314,12 @@ class _WavySeekSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final position = ref.watch(audioPlayerProvider.select((s) => s.position));
     final duration = ref.watch(audioPlayerProvider.select((s) => s.duration));
+    final isLoading = ref.watch(audioPlayerProvider.select((s) => s.isLoading));
 
     return _WavySeekBar(
       position: position,
       duration: duration,
+      isLoading: isLoading,
       onSeek: (d) => ref.read(audioPlayerProvider.notifier).seek(d),
     );
   }
@@ -314,20 +329,54 @@ class _WavySeekBar extends StatefulWidget {
   const _WavySeekBar({
     required this.position,
     required this.duration,
+    required this.isLoading,
     required this.onSeek,
   });
 
   final Duration position;
   final Duration duration;
+  /// Piste (surtout en streaming) en cours de chargement/mise en mémoire
+  /// tampon : la durée réelle n'est pas encore connue.
+  final bool isLoading;
   final ValueChanged<Duration> onSeek;
 
   @override
   State<_WavySeekBar> createState() => _WavySeekBarState();
 }
 
-class _WavySeekBarState extends State<_WavySeekBar> {
+class _WavySeekBarState extends State<_WavySeekBar>
+    with SingleTickerProviderStateMixin {
   bool _dragging = false;
   double _dragProgress = 0;
+  late final AnimationController _loadingController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isLoading) _loadingController.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _WavySeekBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isLoading != oldWidget.isLoading) {
+      if (widget.isLoading) {
+        _loadingController.repeat(reverse: true);
+      } else {
+        _loadingController.stop();
+        _loadingController.value = 0;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _loadingController.dispose();
+    super.dispose();
+  }
 
   String _fmt(Duration d) {
     final m = d.inMinutes;
@@ -378,14 +427,27 @@ class _WavySeekBarState extends State<_WavySeekBar> {
               child: SizedBox(
                 height: 40,
                 width: w,
-                child: CustomPaint(
-                  painter: _WavyProgressPainter(
-                    progress: progress,
-                    activeColor: scheme.primary,
-                    inactiveColor: scheme.outlineVariant,
-                    thumbRingColor: scheme.surface,
-                    amplitude: 5,
-                  ),
+                child: AnimatedBuilder(
+                  animation: _loadingController,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      painter: _WavyProgressPainter(
+                        // Tant que ça charge (surtout streaming en attente de
+                        // buffer), l'onde "respire" pour montrer une activité
+                        // plutôt qu'une barre figée sans info de durée.
+                        progress: widget.isLoading ? 1.0 : progress,
+                        activeColor: widget.isLoading
+                            ? scheme.primary.withValues(
+                                alpha: 0.35 + 0.5 * _loadingController.value,
+                              )
+                            : scheme.primary,
+                        inactiveColor: scheme.outlineVariant,
+                        thumbRingColor: scheme.surface,
+                        amplitude: 6,
+                        showThumb: !widget.isLoading,
+                      ),
+                    );
+                  },
                 ),
               ),
             );
@@ -404,7 +466,9 @@ class _WavySeekBarState extends State<_WavySeekBar> {
                 style: timeStyle,
               ),
               Text(
-                _fmt(widget.duration),
+                widget.isLoading && widget.duration == Duration.zero
+                    ? 'Chargement…'
+                    : _fmt(widget.duration),
                 style: timeStyle,
               ),
             ],
@@ -422,6 +486,7 @@ class _WavyProgressPainter extends CustomPainter {
     required this.inactiveColor,
     required this.thumbRingColor,
     required this.amplitude,
+    this.showThumb = true,
   });
 
   /// Période fixe en pixels : les ondes ne s’étirent pas quand la lecture avance.
@@ -432,16 +497,19 @@ class _WavyProgressPainter extends CustomPainter {
   final Color inactiveColor;
   final Color thumbRingColor;
   final double amplitude;
+  /// false pendant le chargement : la position n'a pas de sens tant que la
+  /// durée réelle n'est pas connue, donc pas de pastille de curseur.
+  final bool showThumb;
 
   @override
   void paint(Canvas canvas, Size size) {
     final midY = size.height / 2;
     final activeW = size.width * progress;
 
-    // Partie non lue : ligne fine droite
+    // Partie non lue : ligne droite (plus épaisse, plus visible)
     final inactivePaint = Paint()
       ..color = inactiveColor
-      ..strokeWidth = 2
+      ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
     canvas.drawLine(
@@ -467,10 +535,12 @@ class _WavyProgressPainter extends CustomPainter {
 
     final wavePaint = Paint()
       ..color = activeColor
-      ..strokeWidth = 3.2
+      ..strokeWidth = 5.5
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, wavePaint);
+
+    if (!showThumb) return;
 
     // Pastille au point courant
     final thumbX = activeW.clamp(6.0, size.width - 6);
@@ -478,16 +548,16 @@ class _WavyProgressPainter extends CustomPainter {
         midY + amplitude * math.sin(2 * math.pi * thumbX / _wavelengthPx);
     canvas.drawCircle(
       Offset(thumbX, thumbY),
-      7,
+      9,
       Paint()..color = activeColor,
     );
     canvas.drawCircle(
       Offset(thumbX, thumbY),
-      7,
+      9,
       Paint()
         ..color = thumbRingColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
+        ..strokeWidth = 2.5,
     );
   }
 
@@ -496,7 +566,8 @@ class _WavyProgressPainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.activeColor != activeColor ||
         oldDelegate.inactiveColor != inactiveColor ||
-        oldDelegate.thumbRingColor != thumbRingColor;
+        oldDelegate.thumbRingColor != thumbRingColor ||
+        oldDelegate.showThumb != showThumb;
   }
 }
 
@@ -575,18 +646,12 @@ class _SideTransportButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: SizedBox(
-          width: 56,
-          height: 56,
-          child: Icon(icon, color: scheme.primary, size: 30),
-        ),
-      ),
+    // Icône seule, sans carte/pastille autour : juste le ripple circulaire.
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon, color: scheme.primary, size: 34),
+      iconSize: 34,
+      splashRadius: 28,
     );
   }
 }
@@ -608,46 +673,47 @@ class _BottomActionsPill extends ConsumerWidget {
     final muted = scheme.onSurfaceVariant;
     final active = scheme.primary;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          IconButton(
-            onPressed: () => notifier.toggleShuffle(),
-            icon: Icon(
-              isShuffled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
-              color: isShuffled ? active : muted,
-            ),
+    // Icônes seules, sans pilule/carte de fond derrière la rangée ; version
+    // pleine (remplie) et agrandie de chaque icône.
+    const iconSize = 28.0;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        IconButton(
+          onPressed: () => notifier.toggleShuffle(),
+          iconSize: iconSize,
+          icon: Icon(
+            isShuffled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
+            color: isShuffled ? active : muted,
           ),
-          IconButton(
-            onPressed: () => notifier.toggleRepeat(),
-            icon: Icon(
-              _repeatIcon(repeatMode),
-              color: repeatMode != RepeatMode.off ? active : muted,
-            ),
+        ),
+        IconButton(
+          onPressed: () => notifier.toggleRepeat(),
+          iconSize: iconSize,
+          icon: Icon(
+            _repeatIcon(repeatMode),
+            color: repeatMode != RepeatMode.off ? active : muted,
           ),
-          IconButton(
-            onPressed: () => context.push(AppRouter.lyrics),
-            icon: Icon(Icons.lyrics_outlined, color: muted),
-            tooltip: 'Paroles',
-          ),
-          IconButton(
-            onPressed: () => context.push(AppRouter.queue),
-            icon: Icon(Icons.queue_music_rounded, color: muted),
-            tooltip: 'File d\'attente',
-          ),
-          IconButton(
-            onPressed: () => _showOptionsMenu(context, ref, song),
-            icon: Icon(Icons.more_horiz_rounded, color: muted),
-            tooltip: 'Plus',
-          ),
-        ],
-      ),
+        ),
+        IconButton(
+          onPressed: () => context.push(AppRouter.lyrics),
+          iconSize: iconSize,
+          icon: Icon(Icons.lyrics_rounded, color: muted),
+          tooltip: 'Paroles',
+        ),
+        IconButton(
+          onPressed: () => context.push(AppRouter.queue),
+          iconSize: iconSize,
+          icon: Icon(Icons.queue_music_rounded, color: muted),
+          tooltip: 'File d\'attente',
+        ),
+        IconButton(
+          onPressed: () => _showOptionsMenu(context, ref, song),
+          iconSize: iconSize,
+          icon: Icon(Icons.more_horiz_rounded, color: muted),
+          tooltip: 'Plus',
+        ),
+      ],
     );
   }
 

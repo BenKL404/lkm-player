@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:musio/core/routing/app_router.dart';
 import 'package:musio/features/music/data/models/song_model.dart';
+import 'package:musio/features/music/data/repositories/music_repository.dart';
 import 'package:musio/features/music/presentation/providers/music_provider.dart';
 import 'package:musio/features/player/presentation/providers/audio_player_provider.dart';
 import 'package:musio/shared/widgets/album_art_image.dart';
@@ -43,7 +44,8 @@ class ForYouScreen extends ConsumerWidget {
               child: CircleAvatar(
                 radius: 18,
                 backgroundColor: scheme.primaryContainer,
-                child: Icon(Icons.person, color: scheme.onPrimaryContainer, size: 20),
+                child: Icon(Icons.person,
+                    color: scheme.onPrimaryContainer, size: 20),
               ),
             ),
           ),
@@ -76,10 +78,11 @@ class ForYouScreen extends ConsumerWidget {
             children: [
               const _HomeHeader(),
               const SizedBox(height: 24),
-              _SourceShortcutsRow(onTapSource: () => context.push(AppRouter.online)),
+              _SourceShortcutsRow(
+                  onTapSource: () => context.push(AppRouter.online)),
               const SizedBox(height: 32),
-
-              Text('Écoutés récemment', style: Theme.of(context).textTheme.titleLarge),
+              Text('Écoutés récemment',
+                  style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 14),
               SizedBox(
                 height: 190,
@@ -102,8 +105,8 @@ class ForYouScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 32),
-
-              Text('Tendances streaming', style: Theme.of(context).textTheme.titleLarge),
+              Text('Tendances streaming',
+                  style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               ...trending.take(6).map(
                     (song) => _TrendingRow(
@@ -113,7 +116,6 @@ class ForYouScreen extends ConsumerWidget {
                           .play(trending, trending.indexOf(song)),
                     ),
                   ),
-
               const SizedBox(height: 90),
             ],
           );
@@ -218,7 +220,8 @@ class _SourceShortcutCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+            border:
+                Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,14 +261,154 @@ class _SourceShortcutCard extends StatelessWidget {
 
 /// Ligne "Tendances streaming" — pochette 56px, titre, icône casque + artiste,
 /// menu contextuel (pas de bouton play dédié : toute la ligne est cliquable).
-class _TrendingRow extends StatelessWidget {
+class _TrendingRow extends ConsumerWidget {
   final SongModel song;
   final VoidCallback onTap;
 
   const _TrendingRow({required this.song, required this.onTap});
 
+  void _showOptionsMenu(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final isFavorite = ref
+            .read(musicProvider)
+            .asData
+            ?.value
+            .songs
+            .firstWhere((s) => s.id == song.id, orElse: () => song)
+            .isFavorite ??
+        song.isFavorite;
+    final albumKey = MusicRepository.effectiveAlbumKey(song);
+    final artistKey = MusicRepository.effectiveArtistKey(song);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            border: Border(
+              top: BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: 0.35)),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: AlbumArtImage(
+                          albumArtPath: song.albumArtPath,
+                          songId: song.id,
+                          size: 44,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              song.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            Text(
+                              song.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(
+                    height: 1,
+                    color: scheme.outlineVariant.withValues(alpha: 0.35)),
+                ListTile(
+                  leading: const Icon(Icons.play_arrow_rounded),
+                  title: const Text('Lire'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onTap();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.queue_music_rounded),
+                  title: const Text('Lire ensuite'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    ref.read(audioPlayerProvider.notifier).addNext(song);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.playlist_add_rounded),
+                  title: const Text('Ajouter à la file'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    ref.read(audioPlayerProvider.notifier).addToQueue(song);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    isFavorite
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: isFavorite ? scheme.primary : null,
+                  ),
+                  title: Text(isFavorite
+                      ? 'Retirer des favoris'
+                      : 'Ajouter aux favoris'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    ref.read(musicProvider.notifier).toggleFavoriteStatus(song);
+                  },
+                ),
+                if (albumKey != null)
+                  ListTile(
+                    leading: const Icon(Icons.album_rounded),
+                    title: const Text('Aller à l\'album'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      context.push('/album/$albumKey');
+                    },
+                  ),
+                if (artistKey != null)
+                  ListTile(
+                    leading: const Icon(Icons.person_rounded),
+                    title: const Text('Aller à l\'artiste'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      context.push('/artist/$artistKey');
+                    },
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
 
@@ -300,7 +443,8 @@ class _TrendingRow extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.headphones_rounded, size: 14, color: scheme.primaryContainer),
+                        Icon(Icons.headphones_rounded,
+                            size: 14, color: scheme.primaryContainer),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -319,7 +463,7 @@ class _TrendingRow extends StatelessWidget {
               ),
               IconButton(
                 icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
-                onPressed: onTap,
+                onPressed: () => _showOptionsMenu(context, ref),
               ),
             ],
           ),
@@ -328,4 +472,3 @@ class _TrendingRow extends StatelessWidget {
     );
   }
 }
-

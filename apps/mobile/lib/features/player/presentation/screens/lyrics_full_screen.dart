@@ -25,7 +25,11 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
 
   Future<void> _extractDominantColor(String albumArtPath) async {
     try {
-      final imageProvider = FileImage(File(albumArtPath));
+      // Redimensionnée avant extraction : décoder la pochette en pleine
+      // résolution juste pour en tirer une couleur dominante est ce qui
+      // saccadait (« ramait ») l'entrée sur cette page à chaque ouverture.
+      final imageProvider =
+          ResizeImage(FileImage(File(albumArtPath)), width: 80, height: 80);
       final palette = await PaletteGenerator.fromImageProvider(
         imageProvider,
         maximumColorCount: 10,
@@ -43,8 +47,13 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final playerState = ref.watch(audioPlayerProvider);
-    final currentSong = playerState.currentSong;
+    // Ne regarder ici que la piste courante : la position change en continu
+    // pendant la lecture, et watcher tout `audioPlayerProvider` reconstruisait
+    // à chaque tick l'écran entier (fond flouté très coûteux compris), d'où
+    // les saccades. Seule la zone des paroles doit réagir à la position
+    // (voir le Consumer dédié dans `_buildLyricsContent`).
+    final currentSong =
+        ref.watch(audioPlayerProvider.select((s) => s.currentSong));
 
     if (currentSong != null && currentSong.id != lastSongId) {
       lastSongId = currentSong.id;
@@ -87,7 +96,12 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          _buildBackground(context, currentSong.albumArtPath, bgColor),
+          // Isolé dans sa propre limite de repaint : le flou de fond est
+          // coûteux (BackdropFilter) et ne doit pas être reconsidéré à
+          // chaque tick de position des paroles au premier plan.
+          RepaintBoundary(
+            child: _buildBackground(context, currentSong.albumArtPath, bgColor),
+          ),
           // Contenu
           SafeArea(
             child: Column(
@@ -130,7 +144,6 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
                       ref,
                       lyrics,
                       currentSong,
-                      playerState.position.inMilliseconds,
                       textColor,
                       iconColor,
                       iconColorDim,
@@ -164,6 +177,12 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
           if (path == null || path.isEmpty || !File(path).existsSync()) {
             return const SizedBox.expand();
           }
+          // Décoder à la taille de l'écran plutôt qu'en pleine résolution
+          // native avant de la flouter (BackdropFilter est déjà coûteux).
+          final size = MediaQuery.sizeOf(context);
+          final dpr = MediaQuery.devicePixelRatioOf(context);
+          final cacheW = (size.width * dpr).round();
+          final cacheH = (size.height * dpr).round();
           return Stack(
             fit: StackFit.expand,
             children: [
@@ -172,6 +191,8 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
                   File(path),
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
+                  cacheWidth: cacheW,
+                  cacheHeight: cacheH,
                 ),
               ),
               // Gradient Blur Overlay (Full Background)
@@ -220,7 +241,6 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
     WidgetRef ref,
     String? lyrics,
     SongModel currentSong,
-    int positionMs,
     Color textColor,
     Color iconColor,
     Color iconColorDim,
@@ -257,88 +277,34 @@ class _LyricsFullScreenState extends ConsumerState<LyricsFullScreen> {
       );
     }
 
+    // Parsé une seule fois par changement de piste/paroles (pas à chaque
+    // tick de position) : c'est le Consumer ci-dessous qui réagit à la
+    // position, isolé du reste de l'écran (fond flouté notamment).
     final lyricModel =
         lyric_ui.LyricsModelBuilder.create().bindLyricToMain(lyrics).getModel();
 
-    return lyric_ui.LyricsReader(
-      model: lyricModel,
-      position: positionMs,
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-      emptyBuilder: () => const SizedBox.shrink(),
-      selectLineBuilder: (progress, confirm) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Material(
-            color: textColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              onTap: () {
-                ref.read(audioPlayerProvider.notifier).seek(
-                      Duration(milliseconds: progress),
-                    );
-                confirm();
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.play_circle_fill_rounded,
-                      color: iconColor,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Aller à ce moment',
-                            style: TextStyle(
-                              color: textColor.withValues(alpha: 0.7),
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            _formatDuration(Duration(milliseconds: progress)),
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      'Lire',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+    return Consumer(
+      builder: (context, ref, _) {
+        final positionMs = ref.watch(
+          audioPlayerProvider.select((s) => s.position.inMilliseconds),
+        );
+        // Pas de `selectLineBuilder` : au relâchement d'un scroll manuel, le
+        // paquet affiche par défaut une carte avec le minutage et un bouton
+        // "Lire" par-dessus le texte — exactement ce qu'on ne veut plus.
+        // En le laissant `null`, un scroll ne montre jamais que les paroles
+        // qui défilent, rien d'autre ne s'affiche.
+        return lyric_ui.LyricsReader(
+          model: lyricModel,
+          position: positionMs,
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          emptyBuilder: () => const SizedBox.shrink(),
+          lyricUi: _CustomLyricUI(
+            textColor,
+            textColor.withValues(alpha: 0.5),
           ),
         );
       },
-      lyricUi: _CustomLyricUI(
-        textColor,
-        textColor.withValues(alpha: 0.5),
-      ),
     );
-  }
-
-  String _formatDuration(Duration d) {
-    final m = d.inMinutes;
-    final s = d.inSeconds.remainder(60);
-    return '$m:${s.toString().padLeft(2, '0')}';
   }
 }
 

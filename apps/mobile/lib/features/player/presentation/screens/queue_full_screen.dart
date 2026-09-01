@@ -1,29 +1,25 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:musio/core/theme/app_theme.dart';
 import 'package:musio/features/music/data/models/song_model.dart';
 import 'package:musio/features/player/presentation/providers/audio_player_provider.dart';
 import 'package:musio/features/player/presentation/providers/sleep_timer_provider.dart';
 import 'package:musio/features/settings/presentation/providers/settings_provider.dart';
+import 'package:musio/shared/widgets/album_art_image.dart';
 
-/// Page plein écran de la file d'attente, style Spotify : bloc "Lecture en cours",
-/// liste "Lecture aléatoire à partir de :", prochaine piste en vert, Shuffle + Minuteur en bas.
+/// Page plein écran de la file d'attente : bloc "Lecture en cours",
+/// liste "Lecture aléatoire à partir de :", prochaine piste en surbrillance,
+/// Shuffle + Minuteur en bas. Thème Sonic Noir (tokens, pas de couleurs figées).
 class QueueFullScreen extends ConsumerWidget {
   const QueueFullScreen({super.key});
-
-  static const _bgDark = Color(0xFF121212);
-  static const _bgGradientTop = Color(0xFF1a1a2e);
-  static const _green = AppTheme.primaryColor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playerState = ref.watch(audioPlayerProvider);
     final sleepRemaining = ref.watch(sleepTimerProvider);
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: _bgDark,
+      backgroundColor: scheme.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -34,14 +30,16 @@ class QueueFullScreen extends ConsumerWidget {
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Text(
                             'Lecture en cours',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -63,10 +61,12 @@ class QueueFullScreen extends ConsumerWidget {
                             playerState.isShuffled
                                 ? 'Lecture aléatoire à partir de :'
                                 : 'À suivre :',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -94,61 +94,49 @@ class QueueFullScreen extends ConsumerWidget {
   }
 
   Widget _buildAppBar(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            _bgGradientTop.withValues(alpha: 0.95),
-            _bgGradientTop.withValues(alpha: 0.0),
-          ],
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.keyboard_arrow_down_rounded),
-              color: Colors.white,
-              iconSize: 32,
-              onPressed: () => Navigator.of(context).pop(),
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+            color: scheme.onSurface,
+            iconSize: 32,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'File d\'attente',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
             ),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'File d\'attente',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildEmpty(BuildContext context) {
-    return const Center(
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.queue_music_rounded,
             size: 72,
-            color: Colors.white24,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Text(
             'La file d\'attente est vide',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 18,
-            ),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
           ),
         ],
       ),
@@ -161,12 +149,13 @@ class QueueFullScreen extends ConsumerWidget {
     bool isShuffled,
     int? sleepRemaining,
   ) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      decoration: const BoxDecoration(
-        color: _bgDark,
+      decoration: BoxDecoration(
+        color: scheme.surface,
         border: Border(
-          top: BorderSide(color: Colors.white12, width: 0.5),
+          top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.4)),
         ),
       ),
       child: Row(
@@ -177,20 +166,20 @@ class QueueFullScreen extends ConsumerWidget {
                   ref.read(audioPlayerProvider.notifier).toggleShuffle(),
               icon: Icon(
                 isShuffled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
-                color: _green,
+                color: scheme.primary,
                 size: 24,
               ),
-              label: const Text(
+              label: Text(
                 'Lecture aléatoire',
                 style: TextStyle(
-                  color: _green,
+                  color: scheme.primary,
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: _green,
-                side: const BorderSide(color: _green),
+                foregroundColor: scheme.primary,
+                side: BorderSide(color: scheme.primary),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
@@ -202,24 +191,24 @@ class QueueFullScreen extends ConsumerWidget {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: () => _showSleepTimerSheet(context, ref),
-              icon: const Icon(
+              icon: Icon(
                 Icons.timer_outlined,
-                color: Colors.white70,
+                color: scheme.onSurfaceVariant,
                 size: 24,
               ),
               label: Text(
                 sleepRemaining != null && sleepRemaining > 0
                     ? '${(sleepRemaining / 60).ceil()} min'
                     : 'Minuteur',
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white70,
-                side: const BorderSide(color: Colors.white24),
+                foregroundColor: scheme.onSurfaceVariant,
+                side: BorderSide(color: scheme.outlineVariant),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
@@ -241,11 +230,16 @@ class QueueFullScreen extends ConsumerWidget {
           final remaining = ref.watch(sleepTimerProvider);
           final defaultMinutes =
               ref.watch(sleepTimerDefaultMinutesProvider).valueOrNull ?? 0;
+          final scheme = Theme.of(context).colorScheme;
           return Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
+              color: scheme.surface,
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(20)),
+              border: Border(
+                top: BorderSide(
+                    color: scheme.outlineVariant.withValues(alpha: 0.35)),
+              ),
             ),
             child: SafeArea(
               child: Padding(
@@ -260,8 +254,9 @@ class QueueFullScreen extends ConsumerWidget {
                         height: 4,
                         margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(
-                          color: Colors.grey.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
+                          color:
+                              scheme.onSurfaceVariant.withValues(alpha: 0.28),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                       ),
                     ),
@@ -279,8 +274,7 @@ class QueueFullScreen extends ConsumerWidget {
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
-                            ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary),
+                            ?.copyWith(color: scheme.primary),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
@@ -361,8 +355,7 @@ class _NowPlayingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final path = song.albumArtPath;
-    final hasArt = path != null && path.isNotEmpty && File(path).existsSync();
+    final scheme = Theme.of(context).colorScheme;
 
     return Material(
       color: Colors.transparent,
@@ -373,24 +366,12 @@ class _NowPlayingCard extends StatelessWidget {
           child: Row(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: hasArt
-                    ? Image.file(
-                        File(path),
-                        width: 56,
-                        height: 56,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        width: 56,
-                        height: 56,
-                        color: Colors.white12,
-                        child: const Icon(
-                          Icons.music_note_rounded,
-                          color: Colors.white38,
-                          size: 28,
-                        ),
-                      ),
+                borderRadius: BorderRadius.circular(10),
+                child: AlbumArtImage(
+                  songId: song.id,
+                  albumArtPath: song.albumArtPath,
+                  size: 56,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -402,21 +383,18 @@ class _NowPlayingCard extends StatelessWidget {
                       song.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       song.artist,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 14,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
                     ),
                   ],
                 ),
@@ -425,9 +403,9 @@ class _NowPlayingCard extends StatelessWidget {
                 onPressed: onPlayPause,
                 icon: Icon(
                   isPlaying
-                      ? Icons.pause_circle_filled
-                      : Icons.play_circle_filled,
-                  color: Colors.white,
+                      ? Icons.pause_circle_filled_rounded
+                      : Icons.play_circle_filled_rounded,
+                  color: scheme.primaryContainer,
                   size: 48,
                 ),
               ),
@@ -456,10 +434,12 @@ class _UpcomingList extends StatelessWidget {
   Widget build(BuildContext context) {
     final upcomingCount = queue.length - (currentIndex + 1);
     if (upcomingCount <= 0) {
-      return const Center(
+      return Center(
         child: Text(
           'Aucune piste suivante',
-          style: TextStyle(color: Colors.white38, fontSize: 14),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
         ),
       );
     }
@@ -478,9 +458,12 @@ class _UpcomingList extends StatelessWidget {
           onTap: () => onSkipTo(queueIndex),
           dragHandle: ReorderableDragStartListener(
             index: index,
-            child: const Icon(
+            child: Icon(
               Icons.drag_handle_rounded,
-              color: Colors.white38,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurfaceVariant
+                  .withValues(alpha: 0.5),
               size: 24,
             ),
           ),
@@ -509,46 +492,28 @@ class _QueueTile extends StatelessWidget {
     super.key,
   });
 
-  static const _green = Color(0xFF1DB954);
-
   @override
   Widget build(BuildContext context) {
-    final path = song.albumArtPath;
-    final hasArt = path != null && path.isNotEmpty && File(path).existsSync();
+    final scheme = Theme.of(context).colorScheme;
+    final accent = scheme.primary;
 
     return Material(
       color: Colors.transparent,
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         onTap: onTap,
-        leading: SizedBox(
-          width: 48,
-          height: 48,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: hasArt
-                ? Image.file(
-                    File(path),
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.cover,
-                  )
-                : Container(
-                    width: 48,
-                    height: 48,
-                    color: Colors.white12,
-                    child: const Icon(
-                      Icons.music_note_rounded,
-                      color: Colors.white38,
-                      size: 24,
-                    ),
-                  ),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: AlbumArtImage(
+            songId: song.id,
+            albumArtPath: song.albumArtPath,
+            size: 48,
           ),
         ),
         title: Row(
           children: [
             if (isNext) ...[
-              const Icon(Icons.play_arrow_rounded, color: _green, size: 20),
+              Icon(Icons.play_arrow_rounded, color: accent, size: 20),
               const SizedBox(width: 6),
             ],
             Expanded(
@@ -556,11 +521,10 @@ class _QueueTile extends StatelessWidget {
                 song.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isNext ? _green : Colors.white70,
-                  fontWeight: isNext ? FontWeight.w600 : FontWeight.normal,
-                  fontSize: 15,
-                ),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: isNext ? accent : scheme.onSurface,
+                      fontWeight: isNext ? FontWeight.w700 : FontWeight.w500,
+                    ),
               ),
             ),
           ],
@@ -569,10 +533,11 @@ class _QueueTile extends StatelessWidget {
           song.artist,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: isNext ? _green.withValues(alpha: 0.9) : Colors.white38,
-            fontSize: 13,
-          ),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: isNext
+                    ? accent.withValues(alpha: 0.85)
+                    : scheme.onSurfaceVariant,
+              ),
         ),
         trailing: dragHandle,
       ),

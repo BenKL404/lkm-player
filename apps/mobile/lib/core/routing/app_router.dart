@@ -17,6 +17,56 @@ import 'package:musio/features/settings/presentation/screens/settings_screen.dar
 import 'package:musio/features/settings/presentation/screens/stats_screen.dart';
 import 'package:musio/shared/screens/song_list_screen.dart';
 
+/// Transition glissée gauche/droite pour toutes les pages « secondaires »
+/// (tout sauf le splash et l'accueil) : la nouvelle page arrive de la
+/// droite, l'ancienne glisse légèrement vers la gauche en profondeur — au
+/// pop c'est l'inverse. Même logique et même durée que le swipe entre
+/// onglets de [MainScreen], pour une sensation cohérente dans toute l'app.
+CustomTransitionPage<void> _slidePage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 320),
+    reverseTransitionDuration: const Duration(milliseconds: 320),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curve = CurveTween(curve: Curves.easeInOutCubic);
+      final incoming =
+          Tween(begin: const Offset(1, 0), end: Offset.zero).chain(curve);
+      final outgoing =
+          Tween(begin: Offset.zero, end: const Offset(-0.25, 0)).chain(curve);
+      return SlideTransition(
+        position: animation.drive(incoming),
+        child: SlideTransition(
+          position: secondaryAnimation.drive(outgoing),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// Transition glissée du bas vers le haut, façon feuille plein écran (Lecture
+/// en cours, Paroles, File d'attente) : ces pages « couvrent » l'écran plutôt
+/// que de s'enchaîner latéralement dans la pile de navigation.
+CustomTransitionPage<void> _bottomSheetPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      const begin = Offset(0.0, 1.0);
+      const end = Offset.zero;
+      const curve = Curves.easeOutQuart; // Courbe douce façon Apple
+      final tween = Tween(begin: begin, end: end).chain(
+        CurveTween(curve: curve),
+      );
+      return SlideTransition(
+        position: animation.drive(tween),
+        child: child,
+      );
+    },
+  );
+}
+
 class AppRouter {
   static const String splash = '/';
   static const String home = '/home';
@@ -61,63 +111,36 @@ class AppRouter {
       GoRoute(
         path: online,
         name: 'online',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const OnlineScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
+        pageBuilder: (context, state) =>
+            _slidePage(state, const OnlineScreen()),
       ),
 
       // Téléchargements (file + historique)
       GoRoute(
         path: downloads,
         name: 'downloads',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const DownloadsScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
+        pageBuilder: (context, state) =>
+            _slidePage(state, const DownloadsScreen()),
       ),
 
       // Settings
       GoRoute(
         path: settings,
         name: 'settings',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const SettingsScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
+        pageBuilder: (context, state) =>
+            _slidePage(state, const SettingsScreen()),
         routes: [
           GoRoute(
             path: 'stats',
             name: 'stats',
-            pageBuilder: (context, state) => CustomTransitionPage(
-              key: state.pageKey,
-              child: const StatsScreen(),
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
-            ),
+            pageBuilder: (context, state) =>
+                _slidePage(state, const StatsScreen()),
           ),
           GoRoute(
             path: 'about',
             name: 'about',
-            pageBuilder: (context, state) => CustomTransitionPage(
-              key: state.pageKey,
-              child: const AboutScreen(),
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
-            ),
+            pageBuilder: (context, state) =>
+                _slidePage(state, const AboutScreen()),
           ),
         ],
       ),
@@ -126,36 +149,42 @@ class AppRouter {
       GoRoute(
         path: songList,
         name: 'song-list',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra;
           if (extra is! Map<String, dynamic> ||
               extra['title'] is! String ||
               extra['songs'] is! List) {
-            return Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 48, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Paramètres invalides',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => context.go(home),
-                      child: const Text('Retour à l\'accueil'),
-                    ),
-                  ],
+            return _slidePage(
+              state,
+              Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          size: 48, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Paramètres invalides',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => context.go(home),
+                        child: const Text('Retour à l\'accueil'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
           }
-          return SongListScreen(
-            title: extra['title'] as String,
-            songs: List<SongModel>.from(extra['songs'] as List),
+          return _slidePage(
+            state,
+            SongListScreen(
+              title: extra['title'] as String,
+              songs: List<SongModel>.from(extra['songs'] as List),
+            ),
           );
         },
       ),
@@ -164,48 +193,24 @@ class AppRouter {
       GoRoute(
         path: nowPlaying,
         name: 'now-playing',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const NowPlayingScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            const begin = Offset(0.0, 1.0);
-            const end = Offset.zero;
-            const curve = Curves.easeOutQuart; // Smoother Apple-like curve
-            final tween = Tween(begin: begin, end: end).chain(
-              CurveTween(curve: curve),
-            );
-            return SlideTransition(
-              position: animation.drive(tween),
-              child: child,
-            );
-          },
-        ),
+        pageBuilder: (context, state) =>
+            _bottomSheetPage(state, const NowPlayingScreen()),
       ),
 
       // Paroles plein écran (style Spotify)
       GoRoute(
         path: lyrics,
         name: 'lyrics',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const LyricsFullScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
+        pageBuilder: (context, state) =>
+            _bottomSheetPage(state, const LyricsFullScreen()),
       ),
 
       // File d'attente plein écran (style Spotify)
       GoRoute(
         path: queue,
         name: 'queue',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const QueueFullScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
+        pageBuilder: (context, state) =>
+            _bottomSheetPage(state, const QueueFullScreen()),
       ),
 
       // Album Details
@@ -214,14 +219,7 @@ class AppRouter {
         name: 'album-details',
         pageBuilder: (context, state) {
           final albumId = state.pathParameters['id']!;
-          return CustomTransitionPage(
-            key: state.pageKey,
-            child: AlbumDetailsScreen(albumId: albumId),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-          );
+          return _slidePage(state, AlbumDetailsScreen(albumId: albumId));
         },
       ),
 
@@ -231,14 +229,7 @@ class AppRouter {
         name: 'artist-details',
         pageBuilder: (context, state) {
           final artistId = state.pathParameters['id']!;
-          return CustomTransitionPage(
-            key: state.pageKey,
-            child: ArtistDetailsScreen(artistId: artistId),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-          );
+          return _slidePage(state, ArtistDetailsScreen(artistId: artistId));
         },
       ),
 
@@ -248,14 +239,8 @@ class AppRouter {
         name: 'playlist-details',
         pageBuilder: (context, state) {
           final playlistId = state.pathParameters['id']!;
-          return CustomTransitionPage(
-            key: state.pageKey,
-            child: PlaylistDetailsScreen(playlistId: playlistId),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-          );
+          return _slidePage(
+              state, PlaylistDetailsScreen(playlistId: playlistId));
         },
       ),
 
@@ -263,13 +248,8 @@ class AppRouter {
       GoRoute(
         path: search,
         name: 'search',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const SearchScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
+        pageBuilder: (context, state) =>
+            _slidePage(state, const SearchScreen()),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

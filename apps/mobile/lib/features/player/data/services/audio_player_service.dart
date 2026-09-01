@@ -83,11 +83,23 @@ class AudioPlayerService {
         }
       }
 
+      // Durée réelle du lecteur (connue une fois le flux — local ou réseau —
+      // chargé), sinon repli sur la durée déclarée par le morceau. Nécessaire
+      // pour le streaming (recherche en ligne) : la durée n'est pas toujours
+      // connue à l'avance (ex. Deezer ne la renvoie pas dans la recherche),
+      // donc `song.duration` vaut 0 tant qu'elle n'a pas été mesurée ainsi.
+      final playerDuration = _audioHandler.player.duration;
+      final resolvedDuration = playerDuration != null && playerDuration > Duration.zero
+          ? playerDuration
+          : (newCurrentSong?.duration != null
+              ? Duration(milliseconds: newCurrentSong!.duration)
+              : Duration.zero);
+
       _updateState(prev.copyWith(
         isPlaying: isPlaying,
         isLoading: isLoading,
         position: position,
-        duration: newCurrentSong?.duration != null ? Duration(milliseconds: newCurrentSong!.duration) : Duration.zero,
+        duration: resolvedDuration,
         currentSong: newCurrentSong,
         currentIndex: newIndex ?? 0,
         isShuffled: shuffleModeEnabled,
